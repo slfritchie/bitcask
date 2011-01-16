@@ -663,9 +663,25 @@ stk_stack* RBEnumerate(rb_red_blk_tree* tree, void* low, void* high) {
   return(enumResultStack);
 }
       
-    
+/***********************************************************************/
+/*  FUNCTION:  RBFirst */
+/**/
+/*    INPUTS:  tree is the tree  */
+/**/
+/*    OUTPUT:  first node in the tree. */
+/**/
+/*    Modifies Input: none */
+/**/
+/***********************************************************************/
   
-  
+rb_red_blk_node* RBFirst(rb_red_blk_tree* tree) {
+  rb_red_blk_node* x=tree->root;
+  rb_red_blk_node* nil=tree->nil;
+  int compVal;
 
-
-
+  if (x == nil) return(0);
+  while(x->left != nil) {
+      x=x->left;
+  }
+  return(x);
+}
