@@ -75,6 +75,9 @@ static void bitcask_keydir_destroy_key(void *);
 static void bitcask_keydir_destroy_info(void *);
 static void bitcask_keydir_print_key(const void *);
 static void bitcask_keydir_print_info(void *);
+static rb_red_blk_tree* new_entries_tree(void);
+static rb_red_blk_tree* new_fstats_tree(void);
+static rb_red_blk_tree* new_global_tree(void);
 
 typedef struct
 {
@@ -214,12 +217,8 @@ fprintf(stderr, "new0\n");
     // leave the name and lock portions null'd out
     bitcask_keydir* keydir = enif_alloc_compat(env, sizeof(bitcask_keydir));
     memset(keydir, '\0', sizeof(bitcask_keydir));
-    keydir->entries  = RBTreeCreate(keydir_entry_equal, keydir_destroy_key,
-                                    keydir_destroy_info,
-                                    keydir_print_key, keydir_print_info);
-    keydir->fstats   = RBTreeCreate(fstats_entry_equal, fstats_destroy_key,
-                                    fstats_destroy_info,
-                                    fstats_print_key, fstats_print_info);
+    keydir->entries  = new_entries_tree();
+    keydir->fstats   = new_fstats_tree();
 
     // Assign the keydir to our handle and hand it back
     handle->keydir = keydir;
@@ -270,12 +269,8 @@ fprintf(stderr, "new1\n");
             strncpy(keydir->name, name, name_sz + 1);
 
             // Initialize hash tables
-            keydir->entries = RBTreeCreate(keydir_entry_equal,
-                                    keydir_destroy_key, keydir_destroy_info,
-                                    keydir_print_key, keydir_print_info);
-            keydir->fstats  = RBTreeCreate(fstats_entry_equal,
-                                    fstats_destroy_key, fstats_destroy_info,
-                                    fstats_print_key, fstats_print_info);
+            keydir->entries = new_entries_tree();
+            keydir->fstats  = new_fstats_tree();
 
             // Be sure to initialize the rwlock and set our refcount
             keydir->lock = enif_rwlock_create(name);
@@ -609,12 +604,8 @@ ERL_NIF_TERM bitcask_nifs_keydir_copy(ErlNifEnv* env, int argc, const ERL_NIF_TE
         bitcask_keydir* new_keydir = enif_alloc_compat(env, sizeof(bitcask_keydir));
         new_handle->keydir = new_keydir;
         memset(new_keydir, '\0', sizeof(bitcask_keydir));
-        new_keydir->entries  = RBTreeCreate(keydir_entry_equal, keydir_destroy_key,
-                                    keydir_destroy_info,
-                                    keydir_print_key, keydir_print_info);
-        new_keydir->fstats   = RBTreeCreate(fstats_entry_equal, fstats_destroy_key,
-                                    fstats_destroy_info,
-                                    fstats_print_key, fstats_print_info);
+        new_keydir->entries = new_entries_tree();
+        new_keydir->fstats  = new_fstats_tree();
 
         fprintf(stderr, "LAZY deep copy SLF at line %d\n", __LINE__);
         abort(); /* SLF: TODO check git repo for code that lived here. */
@@ -1307,6 +1298,29 @@ static void bitcask_keydir_print_info(void *x)
            e->key_count, e->key_bytes, e->refcount, e->is_ready);
 }
 
+static rb_red_blk_tree* new_entries_tree(void)
+{
+    return RBTreeCreate(keydir_entry_equal, keydir_destroy_key,
+                        keydir_destroy_info,
+                        keydir_print_key, keydir_print_info);
+}
+
+static rb_red_blk_tree* new_fstats_tree(void)
+{
+    return RBTreeCreate(fstats_entry_equal, fstats_destroy_key,
+                        fstats_destroy_info,
+                        fstats_print_key, fstats_print_info);
+}
+
+static rb_red_blk_tree* new_global_tree(void)
+{
+    return RBTreeCreate(bitcask_keydir_entry_equal,
+                        bitcask_keydir_destroy_key,
+                        bitcask_keydir_destroy_info,
+                        bitcask_keydir_print_key,
+                        bitcask_keydir_print_info); 
+}
+
 static int on_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
 {
     bitcask_keydir_RESOURCE = enif_open_resource_type_compat(env, "bitcask_keydir_resource",
@@ -1320,11 +1334,7 @@ static int on_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
                                                     0);
     // Initialize shared keydir hashtable
     bitcask_priv_data* priv = enif_alloc_compat(env, sizeof(bitcask_priv_data));
-    priv->global_keydirs = RBTreeCreate(bitcask_keydir_entry_equal,
-                                    bitcask_keydir_destroy_key,
-                                    bitcask_keydir_destroy_info,
-                                    bitcask_keydir_print_key,
-                                    bitcask_keydir_print_info);
+    priv->global_keydirs = new_global_tree();
     priv->global_keydirs_lock = enif_mutex_create("bitcask_global_handles_lock");
     *priv_data = priv;
 
