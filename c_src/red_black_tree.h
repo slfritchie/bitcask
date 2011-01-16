@@ -66,3 +66,4 @@ rb_red_blk_node* RBExactQuery(rb_red_blk_tree*, void*);
 stk_stack * RBEnumerate(rb_red_blk_tree* tree,void* low, void* high);
 void NullFunction(void*);
 rb_red_blk_node* RBFirst(rb_red_blk_tree*);
+rb_red_blk_node* RBNext(rb_red_blk_tree* tree, void* key);

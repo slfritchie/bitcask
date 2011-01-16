@@ -677,11 +677,27 @@ stk_stack* RBEnumerate(rb_red_blk_tree* tree, void* low, void* high) {
 rb_red_blk_node* RBFirst(rb_red_blk_tree* tree) {
   rb_red_blk_node* x=tree->root;
   rb_red_blk_node* nil=tree->nil;
-  int compVal;
 
   if (x == nil) return(0);
   while(x->left != nil) {
       x=x->left;
   }
   return(x);
+}
+
+/***********************************************************************/
+/*  FUNCTION:  RBNext */
+/**/
+/*    INPUTS:  tree is the tree, key is a key  */
+/**/
+/*    OUTPUT:  first node in the tree where node->key > key. */
+/**/
+/*    Modifies Input: none */
+/**/
+/***********************************************************************/
+  
+rb_red_blk_node* RBNext(rb_red_blk_tree* tree, void* key)
+{
+    fprintf(stderr, "RBNext: TODO\n");
+    return(0);
 }

@@ -59,21 +59,22 @@ typedef struct
     uint64_t total_bytes;
 } bitcask_fstats_entry;
 
+static ErlNifEnv *my_env_copy = NULL;
 static int keydir_entry_equal(const void *, const void*);
 static void keydir_destroy_key(void *);
 static void keydir_destroy_info(void *);
-static void keydir_print_key(void *)
-static void keydir_print_info(void *)
+static void keydir_print_key(const void *);
+static void keydir_print_info(void *);
 static int fstats_entry_equal(const void *, const void *);
 static void fstats_destroy_key(void *);
 static void fstats_destroy_info(void *);
-static void fstats_print_key(void *)
-static void fstats_print_info(void *)
-static int global_keydirs_entry_equal(const void *, const void *);
-static void global_keydirs_destroy_key(void *);
-static void global_keydirs_destroy_info(void *);
-static void global_keydirs_print_key(void *)
-static void global_keydirs_print_info(void *)
+static void fstats_print_key(const void *);
+static void fstats_print_info(void *);
+static int bitcask_keydir_entry_equal(const void *, const void *);
+static void bitcask_keydir_destroy_key(void *);
+static void bitcask_keydir_destroy_info(void *);
+static void bitcask_keydir_print_key(const void *);
+static void bitcask_keydir_print_info(void *);
 
 typedef struct
 {
@@ -229,7 +230,7 @@ fprintf(stderr, "new0\n");
 
 ERL_NIF_TERM bitcask_nifs_keydir_new1(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    char name[MAX_FILE_LEN];
+    char name[MAX_PATH_LEN];
     size_t name_sz;
 
 fprintf(stderr, "new1\n");
@@ -338,7 +339,7 @@ static void update_fstats(ErlNifEnv* env, bitcask_keydir* keydir,
         memset(entry, '\0', sizeof(bitcask_fstats_entry));
         entry->file_id = file_id;
 
-        RBTreeInsert(keydir->fstats, entry->file_id, entry);
+        RBTreeInsert(keydir->fstats, &entry->file_id, entry);
     }
     else
     {
@@ -349,19 +350,6 @@ static void update_fstats(ErlNifEnv* env, bitcask_keydir* keydir,
     entry->total_keys  += total_increment;
     entry->live_bytes  += live_bytes_increment;
     entry->total_bytes += total_bytes_increment;
-}
-
-static int keydir_entry_equal(bitcask_keydir_entry* lhs,
-                              bitcask_keydir_entry* rhs)
-{
-    if (lhs->key_sz != rhs->key_sz)
-    {
-        return 0;
-    }
-    else
-    {
-        return (memcmp(lhs->key, rhs->key, lhs->key_sz) == 0);
-    }
 }
 
 static rb_red_blk_node* find_keydir_entry(ErlNifEnv* env, bitcask_keydir* keydir, ErlNifBinary* key)
@@ -420,7 +408,7 @@ ERL_NIF_TERM bitcask_nifs_keydir_put_int(ErlNifEnv* env, int argc, const ERL_NIF
             new_entry->tstamp = entry.tstamp;
             new_entry->key_sz = key.size;
             memcpy(new_entry->key, key.data, key.size);
-            key->data[key->size] = '\0';
+            key.data[key.size] = '\0';
             node = RBTreeInsert(keydir->entries, new_entry->key, new_entry);
 
             // Update the stats
@@ -738,8 +726,10 @@ ERL_NIF_TERM bitcask_nifs_keydir_itr_next(ErlNifEnv* env, int argc, const ERL_NI
         bitcask_keydir_entry* e = (bitcask_keydir_entry*)buf;
         e->key_sz = handle->last_key_sz;
         memcpy(e->key, handle->last_key, handle->last_key_sz);
-        while ((entry = RBSuccessor(keydir->entries, e)) != NULL)
+        rb_red_blk_node *node;
+        while ((node = RBNext(keydir->entries, e)) != NULL)
         {
+            entry = node->info;
             if (1)
             {
                 ErlNifBinary key;
@@ -763,11 +753,10 @@ ERL_NIF_TERM bitcask_nifs_keydir_itr_next(ErlNifEnv* env, int argc, const ERL_NI
                                                      enif_make_uint(env, entry->tstamp));
 
                 // Update the iterator to the next entry
-                (handle->iterator)++;
+                handle->last_key_sz = e->key_sz; /* SLF fixme? */
+                memcpy(handle->last_key, entry->key, entry->key_sz); /* SLF fixme? */
                 return curr;
             }
-            handle->last_key_sz = e->key_sz; /* SLF fixme? */
-            memcpy(handle->last_key, entry->key, entry->key_sz); /* SLF fixme? */
         }
 
         // The iterator is at the end of the table
@@ -828,8 +817,10 @@ ERL_NIF_TERM bitcask_nifs_keydir_info(ErlNifEnv* env, int argc, const ERL_NIF_TE
         bitcask_fstats_entry* curr_f;
         bitcask_fstats_entry f;
         f.file_id = 0;
-        while ((curr_f = RBSuccessor(keydir->entries, &)) != NULL)
+        rb_red_blk_node* node;
+        while ((node = RBNext(keydir->entries, &f)) != NULL)
         {
+            curr_f = node->info;
             if (1)
             {
                 ERL_NIF_TERM fstat = enif_make_tuple5(env,
@@ -872,7 +863,7 @@ ERL_NIF_TERM bitcask_nifs_keydir_release(ErlNifEnv* env, int argc, const ERL_NIF
 
 ERL_NIF_TERM bitcask_nifs_create_file(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    char filename[MAX_FILE_LEN];
+    char filename[MAX_PATH_LEN];
     if (enif_get_string(env, argv[0], filename, sizeof(filename), ERL_NIF_LATIN1) > 0)
     {
         // Try to open the provided filename exclusively.
@@ -931,7 +922,7 @@ ERL_NIF_TERM bitcask_nifs_set_osync(ErlNifEnv* env, int argc, const ERL_NIF_TERM
 
 ERL_NIF_TERM bitcask_nifs_lock_acquire(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    char filename[MAX_FILE_LEN];
+    char filename[MAX_PATH_LEN];
     int is_write_lock = 0;
     if (enif_get_string(env, argv[0], filename, sizeof(filename), ERL_NIF_LATIN1) > 0 &&
         enif_get_int(env, argv[1], &is_write_lock))
@@ -1139,7 +1130,8 @@ static void bitcask_nifs_keydir_resource_cleanup(ErlNifEnv* env, void* arg)
         {
             // This is the last reference to the named keydir. As such,
             // remove it from the hashtable so no one else tries to use it
-            RBDelete(priv->global_keydirs, keydir->name); /* SLF: TODO broken hosed bjorked */
+            rb_red_blk_node* node = RBExactQuery(priv->global_keydirs, keydir);
+            RBDelete(priv->global_keydirs, node);
         }
         else
         {
@@ -1173,13 +1165,47 @@ static void bitcask_nifs_lock_resource_cleanup(ErlNifEnv* env, void* arg)
     lock_release(handle);
 }
 
-static ErlNifEnv *my_env_copy = NULL;
+static int keydir_entry_equal(const void* x, const void* y)
+{
+    const bitcask_keydir_entry* lhs = x;
+    const bitcask_keydir_entry* rhs = y;
+    int cmp;
+
+    if (lhs->key_sz < rhs->key_sz)
+    {
+        cmp = memcmp(lhs->key, rhs->key, lhs->key_sz);
+        if (cmp == 0)
+        {
+            return -1;
+        }
+        else
+        {
+            return cmp;
+        }
+    }
+    else if (lhs->key_sz > rhs->key_sz)
+    {
+        cmp = memcmp(lhs->key, rhs->key, lhs->key_sz);
+        if (cmp == 0)
+        {
+            return 1;
+        }
+        else
+        {
+            return cmp;
+        }
+    }
+    else
+    {
+        return memcmp(lhs->key, rhs->key, lhs->key_sz);
+    }
+}
 
 static void keydir_destroy_key(void *x)
 {
 }
 
-static void keydir_destroy_info(void *x);
+static void keydir_destroy_info(void *x)
 {
     if (my_env_copy == NULL) {
         // noop
@@ -1187,6 +1213,36 @@ static void keydir_destroy_info(void *x);
         bitcask_keydir_entry *current_entry = x;
         enif_free_compat(env, current_entry);
     }
+}
+
+static void keydir_print_key(const void *x)
+{
+    const bitcask_keydir_entry* e = x;
+
+    printf("kdir k: ");
+    fwrite(e->key, e->key_sz, 1, stdout);
+    printf("\n");
+}
+
+static void keydir_print_info(void *x)
+{
+    bitcask_keydir_entry* e = x;
+
+    printf("file_id %lu total_sz %lu offset %llu tstamp %lu {key...}\n",
+           (unsigned long) e->file_id, (unsigned long) e->total_sz, (unsigned long long) e->offset, (unsigned long) e->tstamp);
+}
+
+static int fstats_entry_equal(const void* x, const void* y)
+{
+    const bitcask_fstats_entry* lhs = x;
+    const bitcask_fstats_entry* rhs = y;
+
+    if (lhs->file_id < rhs->file_id)
+        return -1;
+    else if (lhs->file_id == rhs->file_id)
+        return 0;
+    else
+        return -1;
 }
 
 static void fstats_destroy_key(void *x)
@@ -1200,6 +1256,55 @@ static void fstats_destroy_info(void *x)
     } else {
         bitcask_fstats_entry *curr_f = x;
         enif_free_compat(env, curr_f);
+    }
+}
+
+static void fstats_print_key(const void *x)
+{
+    const bitcask_fstats_entry* e = x;
+
+    printf("fstats k: %ul\n", e->file_id);
+}
+
+static void fstats_print_info(void *x)
+{
+    bitcask_fstats_entry* e = x;
+
+    printf("file_id %lu live_keys %lu total_keys %lu live_bytes %llu total_bytes %llu\n",
+           (unsigned long) e->file_id, (unsigned long) e->live_keys,
+           (unsigned long) e->total_keys, (unsigned long long) e->live_bytes,
+           (unsigned long long) e->total_bytes);
+}
+
+static int bitcask_keydir_entry_equal(const void* x, const void* y)
+{
+    const bitcask_keydir* lhs = x;
+    const bitcask_keydir* rhs = y;
+
+    return strcmp(lhs->name, rhs->name);
+}
+
+static void bitcask_keydir_destroy_key(void *x)
+{
+}
+
+static void bitcask_keydir_destroy_info(void *x)
+{
+}
+
+static void bitcask_keydir_print_key(const void *x)
+{
+    const bitcask_keydir* e = x;
+
+    printf("bitcask_keydir k: %s\n", e->name);
+}
+
+static void bitcask_keydir_print_info(void *x)
+{
+    bitcask_keydir* e = x;
+
+    printf("key_count %ld key_bytes %ld refcount %u is_ready %d\n",
+           e->key_count, e->key_bytes, e->refcount, e->is_ready);
 }
 
 static int on_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
@@ -1215,11 +1320,11 @@ static int on_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
                                                     0);
     // Initialize shared keydir hashtable
     bitcask_priv_data* priv = enif_alloc_compat(env, sizeof(bitcask_priv_data));
-    priv->global_keydirs = RBTreeCreate(global_keydirs_entry_equal,
-                                    global_keydirs_destroy_key,
-                                    global_keydirs_destroy_info,
-                                    global_keydirs_print_key,
-                                    global_keydirs_print_info);
+    priv->global_keydirs = RBTreeCreate(bitcask_keydir_entry_equal,
+                                    bitcask_keydir_destroy_key,
+                                    bitcask_keydir_destroy_info,
+                                    bitcask_keydir_print_key,
+                                    bitcask_keydir_print_info);
     priv->global_keydirs_lock = enif_mutex_create("bitcask_global_handles_lock");
     *priv_data = priv;
 
