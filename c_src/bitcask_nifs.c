@@ -718,7 +718,7 @@ ERL_NIF_TERM bitcask_nifs_keydir_itr_next(ErlNifEnv* env, int argc, const ERL_NI
         e->key_sz = handle->last_key_sz;
         memcpy(e->key, handle->last_key, handle->last_key_sz);
         rb_red_blk_node *node;
-        while ((node = RBNext(keydir->entries, e)) != NULL)
+        while ((node = TreeNext(keydir->entries, e)) != NULL)
         {
             entry = node->info;
             if (1)
@@ -809,7 +809,7 @@ ERL_NIF_TERM bitcask_nifs_keydir_info(ErlNifEnv* env, int argc, const ERL_NIF_TE
         bitcask_fstats_entry f;
         f.file_id = 0;
         rb_red_blk_node* node;
-        while ((node = RBNext(keydir->entries, &f)) != NULL)
+        while ((node = TreeNext(keydir->entries, &f)) != NULL)
         {
             curr_f = node->info;
             if (1)

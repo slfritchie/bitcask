@@ -307,7 +307,7 @@ rb_red_blk_node* TreeSuccessor(rb_red_blk_tree* tree,rb_red_blk_node* x) {
       x=y;
       y=y->parent;
     }
-    if (y == root) return(nil);
+    if (y == root) return(0);
     return(y);
   }
 }
@@ -367,17 +367,17 @@ void InorderTreePrint(rb_red_blk_tree* tree, rb_red_blk_node* x) {
   rb_red_blk_node* root=tree->root;
   if (x != tree->nil) {
     InorderTreePrint(tree,x->left);
-    /*XX: printf("\r\nkey="); */
+    printf("\r\nkey="); 
     tree->PrintKey(x->key);
-    /*XX: printf("  info=");*/
+    printf("  info=");
     tree->PrintInfo(x->info);
-    /*XX: printf("  l->key=");*/
-    /*XX: if( x->left == nil) printf("NULL"); else tree->PrintKey(x->left->key);*/
-    /*XX: printf("  r->key=");*/
-    /*XX: if( x->right == nil) printf("NULL"); else tree->PrintKey(x->right->key);*/
-    /*XX: printf("  p->key=");*/
-    /*XX: if( x->parent == root) printf("NULL"); else tree->PrintKey(x->parent->key);*/
-    /*XX: printf("  red=%i\n",x->red);*/
+    printf("  l->key=");
+    if( x->left == nil) printf("NULL"); else tree->PrintKey(x->left->key);
+    printf("  r->key=");
+    if( x->right == nil) printf("NULL"); else tree->PrintKey(x->right->key);
+    printf("  p->key=");
+    if( x->parent == root) printf("NULL"); else tree->PrintKey(x->parent->key);
+    printf("  red=%i\n",x->red);
     InorderTreePrint(tree,x->right);
   }
 }
@@ -693,21 +693,161 @@ rb_red_blk_node* TreeFirst(rb_red_blk_tree* tree) {
   return(x);
 }
 
+int gtEqExistsPredHelper(rb_red_blk_node* node, void* q,
+                         rb_red_blk_node* nil, rb_red_blk_tree* tree)
+{
+    int compVal;
+
+    if (node == nil)
+        return(0);
+    compVal = tree->Compare(node->key, q);
+    if (compVal == 0) {
+        return(1);
+    } else if (compVal > 0) {
+        return 1;
+    } else if (compVal < 0 && node->right != nil) {
+        return gtEqExistsPredHelper(node->right, q, nil, tree);
+    } else {
+        return(0);
+    }
+}
+
+rb_red_blk_node* findSmallestHelper(rb_red_blk_node* node, rb_red_blk_node* nil)
+{
+    if (node == nil) {
+        return(0);
+    } else if (node->left == nil) {
+        return node;
+    } else {
+        return findSmallestHelper(node->left, nil);
+    }
+}
+
+rb_red_blk_node *treeNextHelper(rb_red_blk_node* node, void* q,
+                                rb_red_blk_node* nil, rb_red_blk_tree* tree)
+{
+    int compVal;
+
+    if (node == nil)
+        return(0);
+
+    compVal = tree->Compare(node->key, q);
+    if (compVal == 0) {
+        printf("WIN!  node->key = %s\r\n", node->key);
+        return(TreeSuccessor(tree, node));
+    } else if (compVal < 0) {  /* node->key < q */
+        rb_red_blk_node *next = findSmallestHelper(node->right, nil);
+        if (next == 0) {
+            return(0);
+        } else if (tree->Compare(next->key, q) > 0) {
+            return(next);
+        } else {
+            return(0);
+        }
+    } else {                   /* node->key > q */
+        if (gtEqExistsPredHelper(node->left, q, nil, tree)) {
+printf("C: treeNextHelper @ %s true\r\n", node->key);
+            return treeNextHelper(node->left, q, nil, tree);
+        } else {
+printf("C: treeNextHelper @ %s FALSE\r\n", node->key);
+            return(node);
+        }
+    }
+#ifdef  SLF_FOO
+    if (compVal == 0) {
+        return(TreeSuccessor(tree, x));
+    } else if (compVal < 0) {  /* x->key < q */
+        if (x->right == nil) {
+            if (last_choice_was_left_p) {
+                return(TreeSucessor(tree, x));
+            } else {
+                return(0);
+            }
+        } else {
+            return(treeNextHelper(x->right, q, nil, 0));
+        }
+    } else {                   /* x->key > q */
+        if (x->left == nil) {
+            if (last_choice_was_left_p) {
+                return(x);
+            } else {
+                return(TreeSuccessor(tree, x));
+            }
+        } else {
+            return(treeNextHelper(node->left, q, nil, 1));
+        }
+    }
+#endif  /* SLF_FOO */
+}
+
 /***********************************************************************/
 /*  FUNCTION:  TreeNext */
 /**/
 /*    INPUTS:  tree is the tree, key is a key  */
 /**/
-/*    OUTPUT:  first node in the tree where node->key > key. */
+/*    OUTPUT:  Next node in the tree where node->key > key. */
 /**/
 /*    Modifies Input: none */
 /**/
 /***********************************************************************/
   
-rb_red_blk_node* TreeNext(rb_red_blk_tree* tree, void* key)
+rb_red_blk_node* TreeNext(rb_red_blk_tree* tree, void* q)
 {
-    /*XX: fprintf(stderr, "TreeNext: TODO\n");*/
-    return(0);
+    if (tree->root->left == tree->nil)
+        return(0);
+    return treeNextHelper(tree->root->left, q, tree->nil, tree);
+#ifdef SLF_FOO
+    /*
+    ** SLF: This is similar to RBEnumerate() but looking for lowest key first,
+    ** not the highest key first.
+    */
+    stk_stack* enumResultStack;
+    rb_red_blk_node* nil=tree->nil;
+    rb_red_blk_node* x=tree->root->left;
+    rb_red_blk_node* lastBest=nil;
+    /*XX: rb_red_blk_node* biggest=nil;*/
+    rb_red_blk_node* smallest=nil;
+
+    enumResultStack=StackCreate();
+    while(nil != x) {
+        cmp = 
+        StackPush(ResultStack, x);
+        /*XX:
+        if (biggest == nil || 1 == tree->Compare(x->key, biggest->key)) {
+            biggest = x;
+        } */
+        if (smallest == nil || -1 == tree->Compare(x->key, smallest->key)) {
+            smallest = x;
+        }
+        if ( 1 != (tree->Compare(q, x->key)) ) { /* q <= x->key */
+            x=x->right;
+        } else {
+            x=x->left;
+        }
+    }
+    while ( (lastBest != nil) && (1 != tree->Compare(low,lastBest->key))) {
+        StackPush(enumResultStack,lastBest);
+        lastBest=TreePredecessor(tree,lastBest);
+    }
+    return(enumResultStack);
+#endif  /* SLF_FOO */
+#ifdef SLF_FOO
+  rb_red_blk_node* x=tree->root;
+  rb_red_blk_node* nil=tree->nil;
+  rb_red_blk_node* root=tree->root;
+  int cmp;
+
+  if (x == nil) return(0);
+  cmp = tree->Compare(x->key, key);
+  while (1) {
+      if (cmp == 0) break;
+      if (cmp < 0)
+x->left != nil) {
+      x=x->left;
+  }
+  if (x == root) return(0);
+  return(x);
+#endif  /* SLF_FOO */
 }
 
 #include <string.h>
@@ -768,23 +908,22 @@ static void test_t_destroy_info(void *x)
 
 static void test_t_print_key(const void *x)
 {
-    const test_t *a = x;
+    const char *a = x;
 
-    /*XX: printf("key: %s\r\n", a);*/
+    printf("key: %s, ", a);
 }
 
 static void test_t_print_info(void *x)
 {
     test_t *a = x;
 
-    /*XX: printf("val %d, ", a->val);*/
+    printf("val %d\r\n", a->val);
 }
 
 void test_print_node(rb_red_blk_node *node)
 {
-    test_t *t = node->info;
-    test_t_print_key(t);
-    test_t_print_info(t);
+    test_t_print_key(node->key);
+    test_t_print_info(node->info);
 }
 
 rb_red_blk_tree* test_new_tree(void)
@@ -815,8 +954,6 @@ rb_red_blk_node* test_insert(rb_red_blk_tree *tree, char *key, int val)
 
 rb_red_blk_node* test_exact_query(rb_red_blk_tree *tree, char *key)
 {
-    test_t t;
-
     /*XX: printf("C: test_exact_query: %s\r\n", key);*/
     /*XX: RBTreePrint(tree); */
     return RBExactQuery(tree, key);
@@ -854,11 +991,17 @@ int test_delete(rb_red_blk_tree *tree, char *key)
 
 rb_red_blk_node* test_get_first(rb_red_blk_tree *tree)
 {
-    test_t t;
-
     /*XX: printf("C: before print\r\n");*/
     /*XX: RBTreePrint(tree);*/
     /*XX: printf("C: after print\r\n");*/
     return TreeFirst(tree);
+}
+
+rb_red_blk_node* test_get_next(rb_red_blk_tree *tree, char *key)
+{
+    printf("C: before print\r\n");
+    RBTreePrint(tree);
+    printf("C: after print\r\n");
+    return TreeNext(tree, key);
 }
 
