@@ -1156,6 +1156,19 @@ static void bitcask_nifs_lock_resource_cleanup(ErlNifEnv* env, void* arg)
     lock_release(handle);
 }
 
+/* !@#$! The !@#$! library assumes exactly -1, 0, or 1. !@#$! */
+
+static int memcmp_101(const char *a, const char *b, int len)
+{
+    int cmp = memcmp(a, b, len);
+    if (cmp < 0)
+        return -1;
+    else if (cmp == 0)
+        return 0;
+    else
+        return 1;
+}
+
 static int keydir_entry_equal(const void* x, const void* y)
 {
     const bitcask_keydir_entry* lhs = x;
@@ -1164,7 +1177,7 @@ static int keydir_entry_equal(const void* x, const void* y)
 
     if (lhs->key_sz < rhs->key_sz)
     {
-        cmp = memcmp(lhs->key, rhs->key, lhs->key_sz);
+        cmp = memcmp_101(lhs->key, rhs->key, lhs->key_sz);
         if (cmp == 0)
         {
             return -1;
@@ -1176,7 +1189,7 @@ static int keydir_entry_equal(const void* x, const void* y)
     }
     else if (lhs->key_sz > rhs->key_sz)
     {
-        cmp = memcmp(lhs->key, rhs->key, lhs->key_sz);
+        cmp = memcmp_101(lhs->key, rhs->key, lhs->key_sz);
         if (cmp == 0)
         {
             return 1;
@@ -1188,7 +1201,7 @@ static int keydir_entry_equal(const void* x, const void* y)
     }
     else
     {
-        return memcmp(lhs->key, rhs->key, lhs->key_sz);
+        return memcmp_101(lhs->key, rhs->key, lhs->key_sz);
     }
 }
 

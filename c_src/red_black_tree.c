@@ -367,17 +367,17 @@ void InorderTreePrint(rb_red_blk_tree* tree, rb_red_blk_node* x) {
   rb_red_blk_node* root=tree->root;
   if (x != tree->nil) {
     InorderTreePrint(tree,x->left);
-    printf("info=");
-    tree->PrintInfo(x->info);
-    printf("  key="); 
+    /*XX: printf("\r\nkey="); */
     tree->PrintKey(x->key);
-    printf("  l->key=");
-    if( x->left == nil) printf("NULL"); else tree->PrintKey(x->left->key);
-    printf("  r->key=");
-    if( x->right == nil) printf("NULL"); else tree->PrintKey(x->right->key);
-    printf("  p->key=");
-    if( x->parent == root) printf("NULL"); else tree->PrintKey(x->parent->key);
-    printf("  red=%i\n",x->red);
+    /*XX: printf("  info=");*/
+    tree->PrintInfo(x->info);
+    /*XX: printf("  l->key=");*/
+    /*XX: if( x->left == nil) printf("NULL"); else tree->PrintKey(x->left->key);*/
+    /*XX: printf("  r->key=");*/
+    /*XX: if( x->right == nil) printf("NULL"); else tree->PrintKey(x->right->key);*/
+    /*XX: printf("  p->key=");*/
+    /*XX: if( x->parent == root) printf("NULL"); else tree->PrintKey(x->parent->key);*/
+    /*XX: printf("  red=%i\n",x->red);*/
     InorderTreePrint(tree,x->right);
   }
 }
@@ -470,6 +470,7 @@ rb_red_blk_node* RBExactQuery(rb_red_blk_tree* tree, void* q) {
   int compVal;
   if (x == nil) return(0);
   compVal=tree->Compare(x->key,(int*) q);
+  /*XX: printf("C: x->key = %s, q = %s, compVal = %d\r\n", x->key, q, compVal);*/
   while(0 != compVal) {/*assignemnt*/
     if (1 == compVal) { /* x->key > q */
       x=x->left;
@@ -478,6 +479,7 @@ rb_red_blk_node* RBExactQuery(rb_red_blk_tree* tree, void* q) {
     }
     if ( x == nil) return(0);
     compVal=tree->Compare(x->key,(int*) q);
+    /*XX: printf("C: x->key = %s, q = %s, compVal = %d\r\n", x->key, q, compVal);*/
   }
   return(x);
 }
@@ -664,7 +666,7 @@ stk_stack* RBEnumerate(rb_red_blk_tree* tree, void* low, void* high) {
 }
       
 /***********************************************************************/
-/*  FUNCTION:  RBFirst */
+/*  FUNCTION:  TreeFirst */
 /**/
 /*    INPUTS:  tree is the tree  */
 /**/
@@ -674,19 +676,25 @@ stk_stack* RBEnumerate(rb_red_blk_tree* tree, void* low, void* high) {
 /**/
 /***********************************************************************/
   
-rb_red_blk_node* RBFirst(rb_red_blk_tree* tree) {
+rb_red_blk_node* TreeFirst(rb_red_blk_tree* tree) {
   rb_red_blk_node* x=tree->root;
   rb_red_blk_node* nil=tree->nil;
+  rb_red_blk_node* root=tree->root;
 
+  /*XX: printf("C: TreeFirst line %d tree 0x%lx\r\n", __LINE__, tree);*/
   if (x == nil) return(0);
+  /*XX: printf("C: TreeFirst line %d\r\n", __LINE__);*/
   while(x->left != nil) {
+      /*XX: printf("C: TreeFirst line %d x->left 0x%lx\r\n", __LINE__, x->left);*/
       x=x->left;
   }
+  /*XX: printf("C: TreeFirst line %d x 0x%lx nil 0x%lx\r\n", __LINE__, x, nil);*/
+  if (x == root) return(0);
   return(x);
 }
 
 /***********************************************************************/
-/*  FUNCTION:  RBNext */
+/*  FUNCTION:  TreeNext */
 /**/
 /*    INPUTS:  tree is the tree, key is a key  */
 /**/
@@ -696,8 +704,161 @@ rb_red_blk_node* RBFirst(rb_red_blk_tree* tree) {
 /**/
 /***********************************************************************/
   
-rb_red_blk_node* RBNext(rb_red_blk_tree* tree, void* key)
+rb_red_blk_node* TreeNext(rb_red_blk_tree* tree, void* key)
 {
-    fprintf(stderr, "RBNext: TODO\n");
+    /*XX: fprintf(stderr, "TreeNext: TODO\n");*/
     return(0);
 }
+
+#include <string.h>
+
+#define MAX_NAME_SIZE 4567
+
+typedef struct {
+    char *name;
+    int  val;
+} test_t;
+
+int memcmp_101(const char *a, const char *b, int len)
+{
+    int cmp = memcmp(a, b, len);
+    if (cmp < 0)
+        return -1;
+    else if (cmp == 0)
+        return 0;
+    else
+        return 1;
+}
+
+static int test_t_equal(const void *x, const void *y)
+{
+    const char *a = x, *b = y;
+    int cmp, a_len, b_len;
+
+    a_len = strlen(a);
+    b_len = strlen(b);
+    if (a_len < b_len) {
+        cmp = memcmp_101(a, b, a_len);
+        if (cmp == 0)
+            return -1;
+        else
+            return cmp;
+    } else if (a_len > b_len) {
+        cmp = memcmp_101(a, b, b_len);
+        if (cmp == 0)
+            return 1;
+        else
+            return cmp;
+    } else {
+        return memcmp_101(a, b, a_len);
+    }
+}
+
+static void test_t_destroy_key(void *x)
+{
+    char *a = x;
+
+    free(a);
+}
+
+static void test_t_destroy_info(void *x)
+{
+    free(x);
+}
+
+static void test_t_print_key(const void *x)
+{
+    const test_t *a = x;
+
+    /*XX: printf("key: %s\r\n", a);*/
+}
+
+static void test_t_print_info(void *x)
+{
+    test_t *a = x;
+
+    /*XX: printf("val %d, ", a->val);*/
+}
+
+void test_print_node(rb_red_blk_node *node)
+{
+    test_t *t = node->info;
+    test_t_print_key(t);
+    test_t_print_info(t);
+}
+
+rb_red_blk_tree* test_new_tree(void)
+{
+    return RBTreeCreate(test_t_equal,
+                        test_t_destroy_key,
+                        test_t_destroy_info,
+                        test_t_print_key,
+                        test_t_print_info); 
+}
+
+rb_red_blk_node* test_insert(rb_red_blk_tree *tree, char *key, int val)
+{
+    rb_red_blk_node *node;
+
+    test_t *t = (test_t *) malloc(sizeof(test_t));
+    t->val = val;
+    if ((node = RBExactQuery(tree, key)) != NULL) {
+        test_t *old_t = (test_t *) node->info;
+        t->name = old_t->name;
+        node->info = t;
+        return node;
+    } else {
+        t->name = strdup(key);
+        return RBTreeInsert(tree, t->name, t);
+    }
+}
+
+rb_red_blk_node* test_exact_query(rb_red_blk_tree *tree, char *key)
+{
+    test_t t;
+
+    /*XX: printf("C: test_exact_query: %s\r\n", key);*/
+    /*XX: RBTreePrint(tree); */
+    return RBExactQuery(tree, key);
+}
+
+int test_node_is_null(rb_red_blk_node *node)
+{
+    return node == NULL;
+}
+
+test_t test_node_to_test_t(rb_red_blk_node *node)
+{
+    /*XX: printf("C: node %lu\r\n", node);*/
+    /*XX: printf("C: node->info %lu\r\n", node->info);*/
+    test_t *n = node->info, res;
+
+    /*XX: printf("C: n->name %s\r\n", n->name);*/
+    res.name = n->name;
+    /*XX: printf("C: n->val %d\r\n", n->val);*/
+    res.val = n->val;
+    return res;
+}
+
+int test_delete(rb_red_blk_tree *tree, char *key)
+{
+    rb_red_blk_node *node;
+
+    if ((node = RBExactQuery(tree, key)) != NULL) {
+        RBDelete(tree, node);
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+rb_red_blk_node* test_get_first(rb_red_blk_tree *tree)
+{
+    test_t t;
+
+    /*XX: printf("C: before print\r\n");*/
+    /*XX: RBTreePrint(tree);*/
+    /*XX: printf("C: after print\r\n");*/
+    return TreeFirst(tree);
+}
+
