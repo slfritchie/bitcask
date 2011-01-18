@@ -16,12 +16,14 @@ setup() ->
 
 prop_rb() ->
     ?FORALL(Cmds, commands(?MODULE),
+            collect({len_div_100, length(Cmds) div 100},
+            aggregate(eqc_statem:command_names(Cmds),
             begin
                 {H, S, Res} = run_commands(?MODULE, Cmds),
                 ?WHENFAIL(
                    io:format("Time: ~p\nHistory length: ~p\nHistory: ~p\nState: ~p\nRes: ~p\n",[time(), length(H), H,S,Res]),
                    Res == ok)
-            end).
+            end))).
 
 initial_state() ->
     #state{step = 1,
@@ -35,6 +37,7 @@ command(S) ->
               {call, ?MODULE, get_exact, [{var,1}, gen_key()]},
               {call, ?MODULE, delete, [{var,1}, gen_likely_key(S)]},
               {call, ?MODULE, get_first, [{var,1}]},
+              {call, ?MODULE, get_last, [{var,1}]},
               {call, ?MODULE, get_next, [{var,1}, gen_likely_key(S)]}
              ]).
 
@@ -77,22 +80,10 @@ postcondition(S, {call, _, delete, [_Tree, Key]}, Res) ->
             Res == 0
     end;
 postcondition(S, {call, _, get_first, [_Tree]}, Res) ->
-    case rbt:test_node_is_null(Res) of
-        1 ->
-            S#state.map == [];
-        0 ->
-            %X% io:format("pre: Res = ~p\n", [Res]),
-            {test_t, Ptr, TreeVal} = rbt:test_node_to_test_t(Res),
-            %X% io:format("pre: Res match = ~p\n", [{test_t, Ptr, TreeVal}]),
-            TreeKey = eqc_c:read_string(Ptr),
-            %X% io:format("TreeKey = ~s\n", [TreeKey]),
-            %X% io:format("sorted map = ~p\n", [lists:sort(S#state.map)]),
-            if S#state.map == [] ->
-                    false_map_empty;
-               true ->
-                    {TreeKey, TreeVal} == hd(lists:sort(S#state.map))
-            end
-    end;
+    postcondition_get_firstlast(S, Res, fun(L) -> L end);
+postcondition(S, {call, _, get_last, [_Tree]}, Res) ->
+    postcondition_get_firstlast(S, Res, fun(L) -> lists:reverse(L) end);
+
 postcondition(S, {call, _, get_next, [_Tree, PrevKey]}, Res) ->
     Remaining = lists:dropwhile(fun({K, _V}) when K =< PrevKey -> true;
                                    (_)                         -> false
@@ -105,13 +96,27 @@ postcondition(S, {call, _, get_next, [_Tree, PrevKey]}, Res) ->
             {test_t, Ptr, TreeVal} = rbt:test_node_to_test_t(Res),
             %X% io:format("pre: Res match = ~p\n", [{test_t, Ptr, TreeVal}]),
             TreeKey = eqc_c:read_string(Ptr),
-            io:format("TreeKey = ~s\n", [TreeKey]),
-            io:format("sorted map = ~p\n", [lists:sort(S#state.map)]),
-            io:format("Remaining = ~p\n", [Remaining]),
+            % io:format("TreeKey = ~s\n", [TreeKey]),
+            % io:format("sorted map = ~p\n", [lists:sort(S#state.map)]),
+            % io:format("Remaining = ~p\n", [Remaining]),
             if Remaining == [] ->
                     false_remaining_empty;
                true ->
                     {TreeKey, TreeVal} == hd(Remaining)
+            end
+    end.
+
+postcondition_get_firstlast(S, Res, ListModFun) ->
+    case rbt:test_node_is_null(Res) of
+        1 ->
+            S#state.map == [];
+        0 ->
+            {test_t, Ptr, TreeVal} = rbt:test_node_to_test_t(Res),
+            TreeKey = eqc_c:read_string(Ptr),
+            if S#state.map == [] ->
+                    false_map_empty;
+               true ->
+                    {TreeKey, TreeVal} == hd(ListModFun(lists:sort(S#state.map)))
             end
     end.
 
@@ -128,6 +133,8 @@ next_state2(#state{map = OldMap} = S, _V, {call, _, delete, [_Tree, Key]}) ->
 next_state2(S, _V, {call, _, get_exact, _}) ->
     S;
 next_state2(S, _V, {call, _, get_first, _}) ->
+    S;
+next_state2(S, _V, {call, _, get_last, _}) ->
     S;
 next_state2(S, _V, {call, _, get_next, _}) ->
     S.
@@ -150,6 +157,9 @@ delete(Tree, Key) ->
 
 get_first(Tree) ->
     rbt:test_get_first(Tree).
+
+get_last(Tree) ->
+    rbt:test_get_last(Tree).
 
 get_next(Tree, Key) ->
     rbt:test_get_next(Tree, Key).
