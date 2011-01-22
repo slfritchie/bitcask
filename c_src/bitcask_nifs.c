@@ -361,8 +361,10 @@ static rb_red_blk_node* find_keydir_entry(ErlNifEnv* env, bitcask_keydir* keydir
 
         e->key_sz = key->size;
         memcpy(e->key, key->data, key->size);
-        key->data[key->size] = '\0'; fprintf(stderr, "find_keydir_entry: %s\n", key->data);
-        return RBExactQuery(keydir->entries, e);
+        rb_red_blk_node* xx = RBExactQuery(keydir->entries, e);
+        key->data[key->size] = '\0'; fprintf(stderr, "find_keydir_entry: %s -> 0x%lx\n", key->data, xx);
+        return xx;
+        /* return RBExactQuery(keydir->entries, e); */
     }
     else
     {
@@ -411,7 +413,9 @@ ERL_NIF_TERM bitcask_nifs_keydir_put_int(ErlNifEnv* env, int argc, const ERL_NIF
             memcpy(new_entry->key, key.data, key.size);
             key.data[key.size] = '\0';
             /* Use bitcask_keydir_entry_keycheat hack */
+ fprintf(stderr, "inserting keydir for key %s\r\n", key.data);
             my_tree_insert(keydir->entries, &(new_entry->key_sz), new_entry);
+            fprintf(stderr, "re-read keydir for key %s: 0x%lx\r\n", key.data, RBExactQuery(keydir->entries, &(new_entry->key_sz)));
 
             // Update the stats
             keydir->key_count++;
