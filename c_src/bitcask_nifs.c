@@ -46,9 +46,13 @@ typedef struct
     uint32_t total_sz;
     uint64_t offset;
     uint32_t tstamp;
-    uint16_t key_sz;
-    char     key[0];
+    uint32_t key_sz;            /* must match bitcask_keydir_entry_keycheat */
+    char     key[0];            /* must match bitcask_keydir_entry_keycheat */
 } bitcask_keydir_entry;
+typedef struct {          /* MUST OVERLAP exactly with end of above struct */
+    uint32_t key_sz;            /* must match bitcask_keydir_entry */
+    char     key[0];            /* must match bitcask_keydir_entry */
+} bitcask_keydir_entry_keycheat;
 
 typedef struct
 {
@@ -78,6 +82,7 @@ static void bitcask_keydir_print_info(void *);
 static rb_red_blk_tree* new_entries_tree(void);
 static rb_red_blk_tree* new_fstats_tree(void);
 static rb_red_blk_tree* new_global_tree(void);
+static void my_tree_insert(rb_red_blk_tree *, void *, void *);
 
 typedef struct
 {
@@ -94,12 +99,12 @@ typedef struct
 typedef struct
 {
     bitcask_keydir* keydir;
-    uint16_t        last_key_sz; /* RB tree substitute for iterator */
-    char            last_key[MAX_KEY_LEN];
     ErlNifTid       il_thread;  /* Iterator lock thread */
     ErlNifMutex*    il_signal_mutex;
     ErlNifCond*     il_signal;
     int             il_signal_flag;
+    uint16_t        last_key_sz; /* RB tree substitute for iterator */
+    char            last_key[MAX_KEY_LEN];
 } bitcask_keydir_handle;
 
 typedef struct
@@ -277,7 +282,7 @@ fprintf(stderr, "new1\n");
             keydir->refcount = 1;
 
             // Finally, register this new keydir in the globals
-            RBTreeInsert(priv->global_keydirs, keydir->name, keydir);
+            my_tree_insert(priv->global_keydirs, keydir->name, keydir);
         }
 
         enif_mutex_unlock(priv->global_keydirs_lock);
@@ -334,7 +339,7 @@ static void update_fstats(ErlNifEnv* env, bitcask_keydir* keydir,
         memset(entry, '\0', sizeof(bitcask_fstats_entry));
         entry->file_id = file_id;
 
-        RBTreeInsert(keydir->fstats, &entry->file_id, entry);
+        my_tree_insert(keydir->fstats, &entry->file_id, entry);
     }
     else
     {
@@ -352,10 +357,11 @@ static rb_red_blk_node* find_keydir_entry(ErlNifEnv* env, bitcask_keydir* keydir
     if (key->size < (MAX_KEY_LEN - sizeof(bitcask_keydir_entry) - 1))
     {
         char buf[MAX_KEY_LEN];
-        bitcask_keydir_entry* e = (bitcask_keydir_entry*)buf;
+        bitcask_keydir_entry_keycheat* e = (bitcask_keydir_entry_keycheat*)buf;
+
         e->key_sz = key->size;
         memcpy(e->key, key->data, key->size);
-        /* key->data[key->size] = '\0'; fprintf(stderr, "find_keydir_entry: %s\n", key->data); */
+        key->data[key->size] = '\0'; fprintf(stderr, "find_keydir_entry: %s\n", key->data);
         return RBExactQuery(keydir->entries, e);
     }
     else
@@ -404,7 +410,8 @@ ERL_NIF_TERM bitcask_nifs_keydir_put_int(ErlNifEnv* env, int argc, const ERL_NIF
             new_entry->key_sz = key.size;
             memcpy(new_entry->key, key.data, key.size);
             key.data[key.size] = '\0';
-            node = RBTreeInsert(keydir->entries, new_entry->key, new_entry);
+            /* Use bitcask_keydir_entry_keycheat hack */
+            my_tree_insert(keydir->entries, &(new_entry->key_sz), new_entry);
 
             // Update the stats
             keydir->key_count++;
@@ -1121,7 +1128,7 @@ static void bitcask_nifs_keydir_resource_cleanup(ErlNifEnv* env, void* arg)
         {
             // This is the last reference to the named keydir. As such,
             // remove it from the hashtable so no one else tries to use it
-            rb_red_blk_node* node = RBExactQuery(priv->global_keydirs, keydir);
+            rb_red_blk_node* node = RBExactQuery(priv->global_keydirs, keydir->name);
             RBDelete(priv->global_keydirs, node);
         }
         else
@@ -1161,6 +1168,7 @@ static void bitcask_nifs_lock_resource_cleanup(ErlNifEnv* env, void* arg)
 static int memcmp_101(const char *a, const char *b, int len)
 {
     int cmp = memcmp(a, b, len);
+
     if (cmp < 0)
         return -1;
     else if (cmp == 0)
@@ -1171,33 +1179,26 @@ static int memcmp_101(const char *a, const char *b, int len)
 
 static int keydir_entry_equal(const void* x, const void* y)
 {
-    const bitcask_keydir_entry* lhs = x;
-    const bitcask_keydir_entry* rhs = y;
+    const bitcask_keydir_entry_keycheat* lhs = x;
+    const bitcask_keydir_entry_keycheat* rhs = y;
     int cmp;
 
+    /* lhs->key[lhs->key_sz] = '\0'; rhs->key[rhs->key_sz] = '\0'; fprintf(stderr, "keydir_entry_equal: %s vs %s\n", lhs->key, rhs->key); */
     if (lhs->key_sz < rhs->key_sz)
     {
         cmp = memcmp_101(lhs->key, rhs->key, lhs->key_sz);
         if (cmp == 0)
-        {
             return -1;
-        }
         else
-        {
             return cmp;
-        }
     }
     else if (lhs->key_sz > rhs->key_sz)
     {
         cmp = memcmp_101(lhs->key, rhs->key, lhs->key_sz);
         if (cmp == 0)
-        {
             return 1;
-        }
         else
-        {
             return cmp;
-        }
     }
     else
     {
@@ -1221,7 +1222,7 @@ static void keydir_destroy_info(void *x)
 
 static void keydir_print_key(const void *x)
 {
-    const bitcask_keydir_entry* e = x;
+    const bitcask_keydir_entry_keycheat* e = x;
 
     printf("kdir k: ");
     fwrite(e->key, e->key_sz, 1, stdout);
@@ -1238,12 +1239,12 @@ static void keydir_print_info(void *x)
 
 static int fstats_entry_equal(const void* x, const void* y)
 {
-    const bitcask_fstats_entry* lhs = x;
-    const bitcask_fstats_entry* rhs = y;
+    const uint32_t* lhs = x;
+    const uint32_t* rhs = y;
 
-    if (lhs->file_id < rhs->file_id)
+    if (*lhs < *rhs)
         return -1;
-    else if (lhs->file_id == rhs->file_id)
+    else if (*lhs == *rhs)
         return 0;
     else
         return -1;
@@ -1265,9 +1266,9 @@ static void fstats_destroy_info(void *x)
 
 static void fstats_print_key(const void *x)
 {
-    const bitcask_fstats_entry* e = x;
+    const uint32_t* file_id = x;
 
-    printf("fstats k: %ul\n", e->file_id);
+    printf("fstats k: %ul\n", *file_id);
 }
 
 static void fstats_print_info(void *x)
@@ -1298,9 +1299,9 @@ static void bitcask_keydir_destroy_info(void *x)
 
 static void bitcask_keydir_print_key(const void *x)
 {
-    const bitcask_keydir* e = x;
+    const char* name = x;
 
-    printf("bitcask_keydir k: %s\n", e->name);
+    printf("bitcask_keydir k: %s\n", name);
 }
 
 static void bitcask_keydir_print_info(void *x)
@@ -1332,6 +1333,15 @@ static rb_red_blk_tree* new_global_tree(void)
                         bitcask_keydir_destroy_info,
                         bitcask_keydir_print_key,
                         bitcask_keydir_print_info); 
+}
+
+void my_tree_insert(rb_red_blk_tree *tree, void *key, void *info)
+{
+    /*
+    ** All caller code has checked for duplicates already, so there's
+    ** no risk here of inserting a duplicate.
+    */
+    RBTreeInsert(tree, key, info);
 }
 
 static int on_load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info)
