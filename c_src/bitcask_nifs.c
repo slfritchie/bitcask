@@ -1198,7 +1198,7 @@ static int keydir_entry_equal(const void* x, const void* y)
     }
     else if (lhs->key_sz > rhs->key_sz)
     {
-        cmp = memcmp_101(lhs->key, rhs->key, lhs->key_sz);
+        cmp = memcmp_101(lhs->key, rhs->key, rhs->key_sz);
         if (cmp == 0)
             return 1;
         else
