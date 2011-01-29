@@ -362,7 +362,7 @@ static rb_red_blk_node* find_keydir_entry(ErlNifEnv* env, bitcask_keydir* keydir
         e->key_sz = key->size;
         memcpy(e->key, key->data, key->size);
         rb_red_blk_node* xx = RBExactQuery(keydir->entries, e);
-        key->data[key->size] = '\0'; fprintf(stderr, "find_keydir_entry: %s -> 0x%lx\n", key->data, xx);
+        key->data[key->size] = '\0'; fprintf(stderr, "find_keydir_entry: %s -> 0x%lx\r\n", key->data, xx);
         return xx;
         /* return RBExactQuery(keydir->entries, e); */
     }
@@ -1289,8 +1289,14 @@ static int bitcask_keydir_entry_equal(const void* x, const void* y)
 {
     const bitcask_keydir* lhs = x;
     const bitcask_keydir* rhs = y;
+    int n;
 
-    return strcmp(lhs->name, rhs->name);
+    if ((n = strcmp(lhs->name, rhs->name)) < 0)
+        return -1;
+    else if (n == 0)
+        return 0;
+    else
+        return 1;
 }
 
 static void bitcask_keydir_destroy_key(void *x)
