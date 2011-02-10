@@ -1311,12 +1311,12 @@ static void fstats_print_info(void *x)
 
 static int bitcask_keydir_entry_equal(const void* x, const void* y)
 {
-    const bitcask_keydir* lhs = x;
-    const bitcask_keydir* rhs = y;
+    const char* lhs = x;
+    const char* rhs = y;
     int n;
 
-    fprintf(stderr, "bitcask_keydir_entry_equal: %s %s -> %d\r\n", lhs->name, rhs->name, strcmp(lhs->name, rhs->name));
-    if ((n = strcmp(lhs->name, rhs->name)) < 0)
+    fprintf(stderr, "bitcask_keydir_entry_equal: %s %s -> %d\r\n", lhs, rhs, strcmp(lhs, rhs));
+    if ((n = strcmp(lhs, rhs)) < 0)
         return -1;
     else if (n == 0)
         return 0;
