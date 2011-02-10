@@ -848,8 +848,10 @@ ERL_NIF_TERM bitcask_nifs_keydir_info(ErlNifEnv* env, int argc, const ERL_NIF_TE
         bitcask_fstats_entry f;
         f.file_id = 0;
         rb_red_blk_node* node;
-        while ((node = TreeNext(keydir->fstats, &f)) != NULL)
+        RBTreePrint(keydir->fstats);
+        while ((node = TreeNext(keydir->fstats, &f.file_id)) != NULL)
         {
+            fprintf(stderr, "fstats info line %d\r\n", __LINE__);
             curr_f = node->info;
             if (1)
             {
@@ -861,6 +863,7 @@ ERL_NIF_TERM bitcask_nifs_keydir_info(ErlNifEnv* env, int argc, const ERL_NIF_TE
                                                       enif_make_ulong(env, curr_f->total_bytes));
                 fstats_list = enif_make_list_cell(env, fstat, fstats_list);
             }
+            f.file_id = curr_f->file_id;
         }
 
         ERL_NIF_TERM result = enif_make_tuple3(env,
@@ -1275,6 +1278,7 @@ static int fstats_entry_equal(const void* x, const void* y)
     const uint32_t* lhs = x;
     const uint32_t* rhs = y;
 
+    fprintf(stderr, "fstats entry equal: %lu vs %lu\r\n", *lhs, *rhs);
     if (*lhs < *rhs)
         return -1;
     else if (*lhs == *rhs)
