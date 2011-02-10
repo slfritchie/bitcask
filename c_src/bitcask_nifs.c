@@ -1305,7 +1305,7 @@ static void fstats_print_key(const void *x)
 {
     const uint32_t* file_id = x;
 
-    printf("fstats k: %ul\n", *file_id);
+    printf("fstats k: %lu\n", *file_id);
 }
 
 static void fstats_print_info(void *x)
