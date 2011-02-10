@@ -1318,19 +1318,25 @@ io:format(user, "Line ~p\n", [?LINE]),
     close(init_dataset("/tmp/bc.test.mergeexpirekeydir", [{max_file_size, 1}],
                        default_dataset())),
 
+io:format(user, "Line ~p\n", [?LINE]),
     KDB = bitcask:open("/tmp/bc.test.mergeexpirekeydir"),
+io:format(user, "Line ~p\n", [?LINE]),
 
     %% three keys in the keydir now
     3 = testhelper_keydir_count(KDB),
+io:format(user, "Line ~p\n", [?LINE]),
 
     %% Wait for it all to expire
     timer:sleep(2000),
+io:format(user, "Line ~p\n", [?LINE]),
 
     %% Merge everything
     ok = merge("/tmp/bc.test.mergeexpirekeydir",[{expiry_secs,1}]),
+io:format(user, "Line ~p\n", [?LINE]),
 
     %% should be no keys in the keydir now
     0 = testhelper_keydir_count(KDB),
+io:format(user, "Line ~p\n", [?LINE]),
 
     bitcask:close(KDB),
     ok.
