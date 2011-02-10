@@ -333,15 +333,15 @@ keydir_basic_test() ->
     io:format(user, "Line ~p\n", [?LINE]),
     {ok, Ref} = keydir_new(),
     io:format(user, "Line ~p\n", [?LINE]),
-    ok = keydir_put(Ref, <<"abc">>, 0, 1234, 0, 1),
+    ok = keydir_put(Ref, <<"abc">>, 42, 1234, 0, 1),
     io:format(user, "Line ~p\n", [?LINE]),
 
-    {1, 3, [{0, 1, 1, 1234, 1234}]} = keydir_info(Ref),
+    {1, 3, [{42, 1, 1, 1234, 1234}]} = keydir_info(Ref),
     io:format(user, "Line ~p\n", [?LINE]),
 
     E = keydir_get(Ref, <<"abc">>),
     io:format(user, "Line ~p\n", [?LINE]),
-    0 = E#bitcask_entry.file_id,
+    42 = E#bitcask_entry.file_id,
     io:format(user, "Line ~p\n", [?LINE]),
     1234 = E#bitcask_entry.total_sz,
     io:format(user, "Line ~p\n", [?LINE]),
