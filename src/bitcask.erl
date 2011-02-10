@@ -543,6 +543,7 @@ needs_merge(Ref) ->
                 filelib:is_file(bitcask_fileops:filename(F))
         end,
     {LiveFiles, DeadFiles} = lists:partition(P, State#bc_state.read_files),
+io:format(user, "Line ~p live ~p dead ~p\n", [?LINE, LiveFiles, DeadFiles]),
 
     %% Close the dead files
     [bitcask_fileops:close(F) || F <- DeadFiles],
@@ -599,6 +600,7 @@ status(Ref) ->
     %% and is only an estimate/snapshot.
     {KeyCount, _KeyBytes, Fstats} = bitcask_nifs:keydir_info(
                                       State#bc_state.keydir),
+io:format(user, "Line ~p fstats ~p\n", [?LINE, Fstats]),
 
     %% We want to ignore the file currently being written when
     %% considering status!
@@ -1363,14 +1365,22 @@ io:format(user, "Line ~p\n", [?LINE]),
 frag_status_test() ->
 io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("rm -rf /tmp/bc.test.fragtest"),
+io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("mkdir /tmp/bc.test.fragtest"),
+io:format(user, "Line ~p\n", [?LINE]),
     B1 = bitcask:open("/tmp/bc.test.fragtest", [read_write]),
+io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B1,<<"k">>,<<"v">>),
+io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B1,<<"k">>,<<"z">>),
+io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:close(B1),
     % close and reopen so that status can reflect a closed file
+io:format(user, "Line ~p\n", [?LINE]),
     B2 = bitcask:open("/tmp/bc.test.fragtest", [read_write]),
+io:format(user, "Line ~p\n", [?LINE]),
     {1,[{_,50,16,32}]} = bitcask:status(B2),
+io:format(user, "Line ~p\n", [?LINE]),
     %% 1 key, 50% frag, 16 dead bytes, 32 total bytes
     ok.
 
