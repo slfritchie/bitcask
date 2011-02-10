@@ -393,20 +393,21 @@ keydir_itr_test_base(Ref) ->
     io:format(user, "Line ~p\n", [?LINE]),
     true = lists:keymember(<<"hij">>, #bitcask_entry.key, List).
 
-keydir_copy_test() ->
-    io:format(user, "Line ~p\n", [?LINE]),
-    {ok, Ref1} = keydir_new(),
-    io:format(user, "Line ~p\n", [?LINE]),
-    ok = keydir_put(Ref1, <<"abc">>, 0, 1234, 0, 1),
-    io:format(user, "Line ~p\n", [?LINE]),
-    ok = keydir_put(Ref1, <<"def">>, 0, 4567, 1234, 2),
-    io:format(user, "Line ~p\n", [?LINE]),
-    ok = keydir_put(Ref1, <<"hij">>, 1, 7890, 0, 3),
-    io:format(user, "Line ~p\n", [?LINE]),
+%% There appears to be no external user of keydir_copy().
+%% keydir_copy_test() ->
+%%     io:format(user, "Line ~p\n", [?LINE]),
+%%     {ok, Ref1} = keydir_new(),
+%%     io:format(user, "Line ~p\n", [?LINE]),
+%%     ok = keydir_put(Ref1, <<"abc">>, 0, 1234, 0, 1),
+%%     io:format(user, "Line ~p\n", [?LINE]),
+%%     ok = keydir_put(Ref1, <<"def">>, 0, 4567, 1234, 2),
+%%     io:format(user, "Line ~p\n", [?LINE]),
+%%     ok = keydir_put(Ref1, <<"hij">>, 1, 7890, 0, 3),
+%%     io:format(user, "Line ~p\n", [?LINE]),
 
-    {ok, Ref2} = keydir_copy(Ref1),
-    io:format(user, "Line ~p\n", [?LINE]),
-    #bitcask_entry { key = <<"abc">>} = keydir_get(Ref2, <<"abc">>).
+%%     {ok, Ref2} = keydir_copy(Ref1),
+%%     io:format(user, "Line ~p\n", [?LINE]),
+%%     #bitcask_entry { key = <<"abc">>} = keydir_get(Ref2, <<"abc">>).
 
 keydir_named_test() ->
     io:format(user, "Line ~p\n", [?LINE]),
