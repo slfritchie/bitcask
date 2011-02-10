@@ -1284,7 +1284,7 @@ static int fstats_entry_equal(const void* x, const void* y)
     else if (*lhs == *rhs)
         return 0;
     else
-        return -1;
+        return 1;
 }
 
 static void fstats_destroy_key(void *x)
