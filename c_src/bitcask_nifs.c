@@ -750,7 +750,7 @@ ERL_NIF_TERM bitcask_nifs_keydir_itr_next(ErlNifEnv* env, int argc, const ERL_NI
         //           MAX_KEY_LEN, this fixed buffer stuff is
         //           an ugly hack.
         char buf[MAX_KEY_LEN];
-        bitcask_keydir_entry* e = (bitcask_keydir_entry*)buf;
+        bitcask_keydir_entry_keycheat* e = (bitcask_keydir_entry_keycheat*)buf;
         e->key_sz = handle->last_key_sz;
         memcpy(e->key, handle->last_key, handle->last_key_sz);
         e->key[e->key_sz] = '\0'; fprintf(stderr, "itr line %d handle 0x%lx last key %s\r\n", __LINE__, handle, e->key);
