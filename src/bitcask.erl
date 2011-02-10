@@ -169,7 +169,6 @@ get(Ref, Key, TryNum) ->
         not_found ->
             not_found;
         E when is_record(E, bitcask_entry) ->
-io:format(user, "bitcask get line ~p: E = ~p\n", [?LINE, E]),
             case E#bitcask_entry.tstamp < expiry_time(State#bc_state.opts) of
                 true -> not_found;
                 false ->
@@ -187,7 +186,6 @@ io:format(user, "bitcask get line ~p: E = ~p\n", [?LINE, E]),
                                 {ok, _Key, ?TOMBSTONE} ->
                                     not_found;
                                 {ok, _Key, Value} ->
-io:format(user, "bitcask get line ~p: _Key ~p Value ~p\n", [?LINE, _Key, Value]),
                                     {ok, Value}
                             end
                     end
@@ -250,8 +248,6 @@ put(Ref, Key, Value) ->
     {ok, WriteFile2, Offset, Size} = bitcask_fileops:write(
                                        State2#bc_state.write_file,
                                        Key, Value, Tstamp),
-io:format(user, "put() line ~p key ~p value ~p wf ~p\n", [?LINE, Key, Value, WriteFile2]),
-io:format(user, "put() line ~p key ~p Size ~p Offset ~p Tstamp ~p\n", [?LINE, Key, Size, Offset, Tstamp]),
     ok = bitcask_nifs:keydir_put(State2#bc_state.keydir, Key,
                                  bitcask_fileops:file_tstamp(WriteFile2),
                                  Size, Offset, Tstamp),
@@ -293,7 +289,6 @@ fold_keys(Ref, Fun, Acc0) ->
     %% Fun should be of the form F(#bitcask_entry, A) -> A
     ExpiryTime = expiry_time((get_state(Ref))#bc_state.opts),
     RealFun = fun(BCEntry, Acc) ->
-io:format(user, "Line ~p ~p\n", [?LINE, BCEntry]),
         Key = BCEntry#bitcask_entry.key,
         case BCEntry#bitcask_entry.tstamp < ExpiryTime of
             true ->
@@ -432,7 +427,6 @@ merge1(Dirname, Opts, FilesToMerge) ->
     Partial = not(lists:usort(readable_files(Dirname)) == 
                   lists:usort(FilesToMerge)),
     
-io:format(user, "merge1 line ~p Partial ~p\n", [?LINE, Partial]),
     %% Try to lock for merging
     case bitcask_lockops:acquire(merge, Dirname) of
         {ok, Lock} ->
@@ -445,7 +439,6 @@ io:format(user, "merge1 line ~p Partial ~p\n", [?LINE, Partial]),
     %% Get the live keydir
     case bitcask_nifs:keydir_new(Dirname) of
         {ready, LiveKeyDir} ->
-io:format(user, "merge1 line ~p\n", [?LINE]),
             %% Simplest case; a key dir is already available and
             %% loaded. Go ahead and open just the files we wish to
             %% merge
@@ -456,7 +449,6 @@ io:format(user, "merge1 line ~p\n", [?LINE]),
                        || F <- FilesToMerge];
 
         {not_ready, LiveKeyDir} ->
-io:format(user, "merge1 line ~p\n", [?LINE]),
             %% Live keydir is newly created. We need to go ahead and
             %% load all available data into the keydir in case another
             %% reader/writer comes along in the same VM. Note that we
@@ -467,7 +459,6 @@ io:format(user, "merge1 line ~p\n", [?LINE]),
             %% won't (so that we can close those extra files once
             %% they've been loaded into the keydir)
             P = fun(F) ->
-io:format(user, "merge1 line ~p file ~p\n", [?LINE, bitcask_fileops:filename(F)]),
                         lists:member(bitcask_fileops:filename(F), FilesToMerge)
                 end,
             {InFiles, UnusedFiles} = lists:partition(P, AllFiles),
@@ -488,14 +479,11 @@ io:format(user, "merge1 line ~p file ~p\n", [?LINE, bitcask_fileops:filename(F)]
 
     %% Setup our first output merge file and update the merge lock accordingly
     {ok, Outfile} = bitcask_fileops:create_file(Dirname, Opts),
-io:format(user, "merge1 line ~p OutFile ~p\n", [?LINE, bitcask_fileops:filename(Outfile)]),
     ok = bitcask_lockops:write_activefile(
            Lock, bitcask_fileops:filename(Outfile)),
-io:format(user, "merge1 line ~p\n", [?LINE]),
 
     %% Initialize the other keydirs we need.
     {ok, DelKeyDir} = bitcask_nifs:keydir_new(),
-io:format(user, "merge1 line ~p\n", [?LINE]),
 
     %% Initialize our state for the merge
     State = #mstate { dirname = Dirname,
@@ -511,7 +499,6 @@ io:format(user, "merge1 line ~p\n", [?LINE]),
                       opts = Opts },
 
     %% Finally, start the merge process
-io:format(user, "merge1 line ~p st ~p\n", [?LINE, State]),
     State1 = merge_files(State),
 
     %% Make sure to close the final output file
@@ -524,7 +511,6 @@ io:format(user, "merge1 line ~p st ~p\n", [?LINE, State]),
 
     %% Cleanup the original input files and release our lock
     [begin
-io:format(user, "merge1 line ~p file ~p\n", [?LINE, bitcask_fileops:filename(F)]),
          bitcask_fileops:delete(F),
          bitcask_fileops:close(F)
      end || F <- State#mstate.input_files],
@@ -543,7 +529,6 @@ needs_merge(Ref) ->
                 filelib:is_file(bitcask_fileops:filename(F))
         end,
     {LiveFiles, DeadFiles} = lists:partition(P, State#bc_state.read_files),
-io:format(user, "Line ~p live ~p dead ~p\n", [?LINE, LiveFiles, DeadFiles]),
 
     %% Close the dead files
     [bitcask_fileops:close(F) || F <- DeadFiles],
@@ -600,7 +585,6 @@ status(Ref) ->
     %% and is only an estimate/snapshot.
     {KeyCount, _KeyBytes, Fstats} = bitcask_nifs:keydir_info(
                                       State#bc_state.keydir),
-io:format(user, "Line ~p fstats ~p\n", [?LINE, Fstats]),
 
     %% We want to ignore the file currently being written when
     %% considering status!
@@ -683,7 +667,6 @@ scan_key_files([], _KeyDir, Acc) ->
 scan_key_files([Filename | Rest], KeyDir, Acc) ->
     {ok, File} = bitcask_fileops:open_file(Filename),
     F = fun(K, Tstamp, {Offset, TotalSz}, _) ->
-io:format(user, "scan_key_files line ~p K ~p\n", [?LINE, K]),
                 bitcask_nifs:keydir_put(KeyDir,
                                         K,
                                         bitcask_fileops:file_tstamp(File),
@@ -703,7 +686,6 @@ init_keydir(Dirname, WaitTime) ->
     %% all the data from disk and we can short-circuit scanning all the files.
     case bitcask_nifs:keydir_new(Dirname) of
         {ready, KeyDir} ->
-io:format(user, "Keydir opt 1\n", []),
             %% A keydir already exists, nothing more to do here. We'll lazy
             %% open files as needed.
             {ok, KeyDir, []};
@@ -713,9 +695,7 @@ io:format(user, "Keydir opt 1\n", []),
             %% the data from disk. Build a list of all the bitcask data files
             %% and sort it in descending order (newest->oldest).
             SortedFiles = readable_files(Dirname),
-io:format(user, "Keydir opt 2 files ~p\n", [SortedFiles]),
             ReadFiles = scan_key_files(SortedFiles, KeyDir, []),
-io:format(user, "Keydir opt 2 ReadFiles ~p\n", [ReadFiles]),
 
             %% Now that we loaded all the data, mark the keydir as ready
             %% so other callers can use it
@@ -835,7 +815,6 @@ inner_merge_write(K, V, Tstamp, State) ->
     {ok, Outfile, Offset, Size} =
         bitcask_fileops:write(State1#mstate.out_file,
                               K, V, Tstamp),
-io:format(user, "inner line ~p ~p ~p ~p -> ~p ~p ~p\n", [?LINE, K, V, Tstamp, Outfile, Offset, Size]),
     
     %% Update live keydir for the current out
     %% file. It's possible that this is a noop, as
@@ -936,7 +915,6 @@ init_dataset(Dirname, Opts, KVs) ->
 
     B = bitcask:open(Dirname, [read_write] ++ Opts),
     lists:foldl(fun({K, V}, _) ->
-io:format(user, "init_dataset Line ~p K ~p V ~p\n", [?LINE, K, V]),
                         ok = bitcask:put(B, K, V)
                 end, undefined, KVs),
     B.
@@ -951,42 +929,27 @@ default_dataset() ->
 %% bitcask is available on the code path. Assumption here
 %% is that we're running in .eunit/ as part of rebar.
 a0_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     code:add_pathz("../ebin").
 
 roundtrip_test() ->
-io:format(user, "roundtrip_test line ~p\n", [?LINE]),
     os:cmd("rm -rf /tmp/bc.test.roundtrip"),
-io:format(user, "roundtrip_test line ~p\n", [?LINE]),
     B = bitcask:open("/tmp/bc.test.roundtrip", [read_write]),
-io:format(user, "roundtrip_test line ~p\n", [?LINE]),
     ok = bitcask:put(B,<<"k">>,<<"v">>),
-io:format(user, "roundtrip_test line ~p\n", [?LINE]),
     {ok, <<"v">>} = bitcask:get(B,<<"k">>),
-io:format(user, "roundtrip_test line ~p\n", [?LINE]),
     ok = bitcask:put(B, <<"k2">>, <<"v2">>),
-io:format(user, "roundtrip_test line ~p\n", [?LINE]),
     ok = bitcask:put(B, <<"k">>,<<"v3">>),
-io:format(user, "roundtrip_test line ~p\n", [?LINE]),
     {ok, <<"v2">>} = bitcask:get(B, <<"k2">>),
-io:format(user, "roundtrip_test line ~p\n", [?LINE]),
     {ok, <<"v3">>} = bitcask:get(B, <<"k">>),
-io:format(user, "roundtrip_test line ~p\n", [?LINE]),
     close(B).
 
 write_lock_perms_test() ->
     os:cmd("rm -rf /tmp/bc.test.writelockperms"),
-io:format(user, "Line ~p\n", [?LINE]),
     B = bitcask:open("/tmp/bc.test.writelockperms", [read_write]),
-io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B, <<"k">>, <<"v">>),
-io:format(user, "Line ~p\n", [?LINE]),
     {ok, Info} = file:read_file_info("/tmp/bc.test.writelockperms/bitcask.write.lock"),
-io:format(user, "Line ~p\n", [?LINE]),
     ?assertEqual(8#00600, Info#file_info.mode band 8#00600).
 
 list_data_files_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("rm -rf /tmp/bc.test.list; mkdir -p /tmp/bc.test.list"),
 
     %% Generate a list of files from 12->8 (already in order we expect
@@ -1000,7 +963,6 @@ io:format(user, "Line ~p\n", [?LINE]),
     ExpFiles = list_data_files("/tmp/bc.test.list", undefined, undefined).
 
 fold_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     B = init_dataset("/tmp/bc.test.fold", default_dataset()),
 
     File = (get_state(B))#bc_state.write_file,
@@ -1011,76 +973,55 @@ io:format(user, "Line ~p\n", [?LINE]),
     close(B).
 
 open_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     close(init_dataset("/tmp/bc.test.open", default_dataset())),
-io:format(user, "Line ~p\n", [?LINE]),
 
     B = bitcask:open("/tmp/bc.test.open"),
-io:format(user, "Line ~p\n", [?LINE]),
     lists:foldl(fun({K, V}, _) ->
-io:format(user, "Line ~p\n", [?LINE]),
                         {ok, V} = bitcask:get(B, K)
                 end, undefined, default_dataset()),
     close(B).
 
 wrap_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     %% Initialize dataset with max_file_size set to 1 so that each file will
     %% only contain a single key.
     close(init_dataset("/tmp/bc.test.wrap",
                        [{max_file_size, 1}], default_dataset())),
 
-io:format(user, "Line ~p\n", [?LINE]),
     B = bitcask:open("/tmp/bc.test.wrap"),
 
     %% Check that all our data is available
-io:format(user, "Line ~p\n", [?LINE]),
     lists:foldl(fun({K, V}, _) ->
-io:format(user, "Line ~p\n", [?LINE]),
                         {ok, V} = bitcask:get(B, K)
                 end, undefined, default_dataset()),
 
     %% Finally, verify that there are 3 files currently opened for read
     %% (one for each key)
-io:format(user, "Line ~p\n", [?LINE]),
     3 = length(readable_files("/tmp/bc.test.wrap")).
 
 
 merge_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     %% Initialize dataset with max_file_size set to 1 so that each file will
     %% only contain a single key.
     close(init_dataset("/tmp/bc.test.merge",
                        [{max_file_size, 1}], default_dataset())),
 
     %% Verify number of files in directory
-io:format(user, "Line ~p\n", [?LINE]),
     3 = length(readable_files("/tmp/bc.test.merge")),
 
     %% Merge everything
-io:format(user, "Line ~p\n", [?LINE]),
     ok = merge("/tmp/bc.test.merge"),
 
     %% Verify we've now only got one file
-io:format(user, "Line ~p\n", [?LINE]),
     1 = length(readable_files("/tmp/bc.test.merge")),
 
     %% Make sure all the data is present
-io:format(user, "Line ~p\n", [?LINE]),
     B = bitcask:open("/tmp/bc.test.merge"),
-io:format(user, "Line ~p\n", [?LINE]),
     lists:foldl(fun({K, V}, _) ->
-io:format(user, "Line ~p key ~p res ~p\n", [?LINE, K, bitcask:get(B, K)])
-                end, undefined, default_dataset() ++ [{<<"x">>,<<"x">>}]),
-
-    lists:foldl(fun({K, V}, _) ->
-io:format(user, "Line ~p\n", [?LINE]),
                         {ok, V} = bitcask:get(B, K)
                 end, undefined, default_dataset()).
 
 
 bitfold_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("rm -rf /tmp/bc.test.bitfold"),
     B = bitcask:open("/tmp/bc.test.bitfold", [read_write]),
     ok = bitcask:put(B,<<"k">>,<<"v">>),
@@ -1099,35 +1040,21 @@ io:format(user, "Line ~p\n", [?LINE]),
     ok.
 
 list_keys_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("rm -rf /tmp/bc.test.listkeys"),
-io:format(user, "Line ~p\n", [?LINE]),
     B = bitcask:open("/tmp/bc.test.listkeys", [read_write]),
-io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B,<<"k">>,<<"v">>),
-io:format(user, "Line ~p\n", [?LINE]),
     {ok, <<"v">>} = bitcask:get(B,<<"k">>),
-io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B, <<"k2">>, <<"v2">>),
-io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B, <<"k">>,<<"v3">>),
-io:format(user, "Line ~p\n", [?LINE]),
     {ok, <<"v2">>} = bitcask:get(B, <<"k2">>),
-io:format(user, "Line ~p\n", [?LINE]),
     {ok, <<"v3">>} = bitcask:get(B, <<"k">>),
-io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:delete(B,<<"k">>),
-io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B, <<"k7">>,<<"v7">>),
-io:format(user, "Line ~p\n", [?LINE]),
     true = ([<<"k2">>,<<"k7">>] =:= lists:sort(bitcask:list_keys(B))),
-io:format(user, "Line ~p\n", [?LINE]),
     close(B),
-io:format(user, "Line ~p\n", [?LINE]),
     ok.
 
 expire_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("rm -rf /tmp/bc.test.expire"),
     B = bitcask:open("/tmp/bc.test.expire", [read_write,{expiry_secs,1}]),
     ok = bitcask:put(B,<<"k">>,<<"v">>),
@@ -1143,7 +1070,6 @@ io:format(user, "Line ~p\n", [?LINE]),
     ok.
 
 expire_merge_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     %% Initialize dataset with max_file_size set to 1 so that each file will
     %% only contain a single key.
     close(init_dataset("/tmp/bc.test.mergeexpire", [{max_file_size, 1}],
@@ -1168,7 +1094,6 @@ io:format(user, "Line ~p\n", [?LINE]),
     ok.
 
 fold_deleted_test() ->    
-io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("rm -rf /tmp/bc.test.fold_delete"),
     B = bitcask:open("/tmp/bc.test.fold_delete",
                      [read_write,{max_file_size, 1}]),
@@ -1179,7 +1104,6 @@ io:format(user, "Line ~p\n", [?LINE]),
     ok.
 
 lazy_open_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("rm -rf /tmp/bc.test.opp_open"),
 
     %% Just opening/closing should not create any files.
@@ -1196,7 +1120,6 @@ io:format(user, "Line ~p\n", [?LINE]),
     ok.
 
 open_reset_open_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("rm -rf /tmp/bc.test.twice"),
     B1 = bitcask:open("/tmp/bc.test.twice", [read_write]),
     ok = bitcask:put(B1,<<"k">>,<<"v">>),
@@ -1208,7 +1131,6 @@ io:format(user, "Line ~p\n", [?LINE]),
     bitcask:close(B2).
 
 delete_merge_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     %% Initialize dataset with max_file_size set to 1 so that each file will
     %% only contain a single key.
     close(init_dataset("/tmp/bc.test.delmerge", [{max_file_size, 1}],
@@ -1233,7 +1155,6 @@ io:format(user, "Line ~p\n", [?LINE]),
     ok.
 
 delete_partial_merge_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     %% Initialize dataset with max_file_size set to 1 so that each file will
     %% only contain a single key.
     close(init_dataset("/tmp/bc.test.pardel", [{max_file_size, 1}],
@@ -1262,7 +1183,6 @@ io:format(user, "Line ~p\n", [?LINE]),
     ok.
 
 corrupt_file_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("rm -rf /tmp/bc.test.corrupt"),
     B1 = bitcask:open("/tmp/bc.test.corrupt", [read_write]),
     ok = bitcask:put(B1,<<"k">>,<<"v">>),
@@ -1314,37 +1234,29 @@ testhelper_keydir_count(B) ->
     KeyCount.
     
 expire_keydir_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     %% Initialize dataset with max_file_size set to 1 so that each file will
     %% only contain a single key.
     close(init_dataset("/tmp/bc.test.mergeexpirekeydir", [{max_file_size, 1}],
                        default_dataset())),
 
-io:format(user, "Line ~p\n", [?LINE]),
     KDB = bitcask:open("/tmp/bc.test.mergeexpirekeydir"),
-io:format(user, "Line ~p\n", [?LINE]),
 
     %% three keys in the keydir now
     3 = testhelper_keydir_count(KDB),
-io:format(user, "Line ~p\n", [?LINE]),
 
     %% Wait for it all to expire
     timer:sleep(2000),
-io:format(user, "Line ~p\n", [?LINE]),
 
     %% Merge everything
     ok = merge("/tmp/bc.test.mergeexpirekeydir",[{expiry_secs,1}]),
-io:format(user, "Line ~p\n", [?LINE]),
 
     %% should be no keys in the keydir now
     0 = testhelper_keydir_count(KDB),
-io:format(user, "Line ~p\n", [?LINE]),
 
     bitcask:close(KDB),
     ok.
 
 delete_keydir_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     close(init_dataset("/tmp/bc.test.deletekeydir", [],
                        default_dataset())),
 
@@ -1363,24 +1275,15 @@ io:format(user, "Line ~p\n", [?LINE]),
     ok.
 
 frag_status_test() ->
-io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("rm -rf /tmp/bc.test.fragtest"),
-io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("mkdir /tmp/bc.test.fragtest"),
-io:format(user, "Line ~p\n", [?LINE]),
     B1 = bitcask:open("/tmp/bc.test.fragtest", [read_write]),
-io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B1,<<"k">>,<<"v">>),
-io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B1,<<"k">>,<<"z">>),
-io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:close(B1),
     % close and reopen so that status can reflect a closed file
-io:format(user, "Line ~p\n", [?LINE]),
     B2 = bitcask:open("/tmp/bc.test.fragtest", [read_write]),
-io:format(user, "Line ~p\n", [?LINE]),
     {1,[{_,50,16,32}]} = bitcask:status(B2),
-io:format(user, "Line ~p\n", [?LINE]),
     %% 1 key, 50% frag, 16 dead bytes, 32 total bytes
     ok.
 
