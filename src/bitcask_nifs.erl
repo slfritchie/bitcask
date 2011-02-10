@@ -330,114 +330,72 @@ make_bogus_non_neg() ->
 -ifdef(TEST).
 
 keydir_basic_test() ->
-    io:format(user, "Line ~p\n", [?LINE]),
     {ok, Ref} = keydir_new(),
-    io:format(user, "Line ~p\n", [?LINE]),
     ok = keydir_put(Ref, <<"abc">>, 42, 1234, 0, 1),
-    io:format(user, "Line ~p\n", [?LINE]),
 
     {1, 3, [{42, 1, 1, 1234, 1234}]} = keydir_info(Ref),
-    io:format(user, "Line ~p\n", [?LINE]),
 
     E = keydir_get(Ref, <<"abc">>),
-    io:format(user, "Line ~p\n", [?LINE]),
     42 = E#bitcask_entry.file_id,
-    io:format(user, "Line ~p\n", [?LINE]),
     1234 = E#bitcask_entry.total_sz,
-    io:format(user, "Line ~p\n", [?LINE]),
     0 = E#bitcask_entry.offset,
-    io:format(user, "Line ~p\n", [?LINE]),
     1 = E#bitcask_entry.tstamp,
-    io:format(user, "Line ~p\n", [?LINE]),
 
     already_exists = keydir_put(Ref, <<"abc">>, 0, 1234, 0, 0),
-    io:format(user, "Line ~p\n", [?LINE]),
 
     ok = keydir_remove(Ref, <<"abc">>),
-    io:format(user, "Line ~p\n", [?LINE]),
     not_found = keydir_get(Ref, <<"abc">>).
 
 keydir_itr_anon_test() ->
-    io:format(user, "Line ~p\n", [?LINE]),
     {ok, Ref} = keydir_new(),
-    io:format(user, "Line ~p\n", [?LINE]),
     keydir_itr_test_base(Ref).
 
 keydir_itr_named_test() ->
-    io:format(user, "Line ~p\n", [?LINE]),
     {not_ready, Ref} = keydir_new("keydir_itr_named_test"),
-    io:format(user, "Line ~p\n", [?LINE]),
     keydir_mark_ready(Ref),
-    io:format(user, "Line ~p\n", [?LINE]),
     keydir_itr_test_base(Ref).
 
 keydir_itr_test_base(Ref) ->
-    io:format(user, "Line ~p\n", [?LINE]),
     ok = keydir_put(Ref, <<"abc">>, 0, 1234, 0, 1),
-    io:format(user, "Line ~p\n", [?LINE]),
     ok = keydir_put(Ref, <<"def">>, 0, 4567, 1234, 2),
-    io:format(user, "Line ~p\n", [?LINE]),
     ok = keydir_put(Ref, <<"hij">>, 1, 7890, 0, 3),
-    io:format(user, "Line ~p\n", [?LINE]),
 
     {3, 9, _} = keydir_info(Ref),
-    io:format(user, "Line ~p\n", [?LINE]),
 
     List = keydir_fold(Ref, fun(E, Acc) -> [ E | Acc] end, []),
-    io:format(user, "Line ~p\n", [?LINE]),
     3 = length(List),
-    io:format(user, "Line ~p\n", [?LINE]),
     true = lists:keymember(<<"abc">>, #bitcask_entry.key, List),
-    io:format(user, "Line ~p\n", [?LINE]),
     true = lists:keymember(<<"def">>, #bitcask_entry.key, List),
-    io:format(user, "Line ~p\n", [?LINE]),
     true = lists:keymember(<<"hij">>, #bitcask_entry.key, List).
 
 %% There appears to be no external user of keydir_copy().
 %% keydir_copy_test() ->
-%%     io:format(user, "Line ~p\n", [?LINE]),
 %%     {ok, Ref1} = keydir_new(),
-%%     io:format(user, "Line ~p\n", [?LINE]),
 %%     ok = keydir_put(Ref1, <<"abc">>, 0, 1234, 0, 1),
-%%     io:format(user, "Line ~p\n", [?LINE]),
 %%     ok = keydir_put(Ref1, <<"def">>, 0, 4567, 1234, 2),
-%%     io:format(user, "Line ~p\n", [?LINE]),
 %%     ok = keydir_put(Ref1, <<"hij">>, 1, 7890, 0, 3),
-%%     io:format(user, "Line ~p\n", [?LINE]),
 
 %%     {ok, Ref2} = keydir_copy(Ref1),
-%%     io:format(user, "Line ~p\n", [?LINE]),
 %%     #bitcask_entry { key = <<"abc">>} = keydir_get(Ref2, <<"abc">>).
 
 keydir_named_test() ->
-    io:format(user, "Line ~p\n", [?LINE]),
     {not_ready, Ref} = keydir_new("k1"),
-    io:format(user, "Line ~p\n", [?LINE]),
     ok = keydir_put(Ref, <<"abc">>, 0, 1234, 0, 1),
-    io:format(user, "Line ~p\n", [?LINE]),
     keydir_mark_ready(Ref),
-    io:format(user, "Line ~p\n", [?LINE]),
 
     {ready, Ref2} = keydir_new("k1"),
-    io:format(user, "Line ~p\n", [?LINE]),
     #bitcask_entry { key = <<"abc">> } = keydir_get(Ref2, <<"abc">>).
 
 keydir_named_not_ready_test() ->
-    io:format(user, "Line ~p\n", [?LINE]),
     {not_ready, Ref} = keydir_new("k2"),
-    io:format(user, "Line ~p\n", [?LINE]),
     ok = keydir_put(Ref, <<"abc">>, 0, 1234, 0, 1),
 
     {error, not_ready} = keydir_new("k2").
 
 create_file_test() ->
-    io:format(user, "Line ~p\n", [?LINE]),
     Fname = "/tmp/bitcask_nifs.createfile.test",
-    io:format(user, "Line ~p\n", [?LINE]),
     file:delete(Fname),
-    io:format(user, "Line ~p\n", [?LINE]),
     true = create_file(Fname),
-    io:format(user, "Line ~p\n", [?LINE]),
     false = create_file(Fname).
 
 -ifdef(EQC).
