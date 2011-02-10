@@ -365,6 +365,7 @@ static rb_red_blk_node* find_keydir_entry(ErlNifEnv* env, bitcask_keydir* keydir
 
         e->key_sz = key->size;
         memcpy(e->key, key->data, key->size);
+#ifdef DELME
         rb_red_blk_node* xx = RBExactQuery(keydir->entries, e);
         {
             char foobuf[99999];
@@ -372,8 +373,10 @@ static rb_red_blk_node* find_keydir_entry(ErlNifEnv* env, bitcask_keydir* keydir
             foobuf[key->size] = '\0';
             fprintf(stderr, "find_keydir_entry: kd 0x%lx %s key %s -> 0x%lx info 0x%lx\r\n", keydir->entries, keydir->name, foobuf, xx, (xx == NULL) ? 0 : xx->info);
         }
+
         return xx;
-        /* return RBExactQuery(keydir->entries, e); */
+#endif /* DELME */
+        return RBExactQuery(keydir->entries, e);
     }
     else
     {
@@ -423,19 +426,23 @@ ERL_NIF_TERM bitcask_nifs_keydir_put_int(ErlNifEnv* env, int argc, const ERL_NIF
             memcpy(new_entry->key, key.data, key.size);
             /* key.data[key.size] = '\0'; */
             /* Use bitcask_keydir_entry_keycheat hack */
+#ifdef  DELME
             {
                 char foobuf[99999];
                 memcpy(foobuf, key.data, key.size);
                 foobuf[key.size] = '\0';
                 fprintf(stderr, "inserting keydir for key %s\r\n", foobuf);
             }
+#endif /* DELME */
             my_tree_insert(keydir->entries, &(new_entry->key_sz), new_entry);
+#ifdef  DELME
             {
                 char foobuf[99999];
                 memcpy(foobuf, key.data, key.size);
                 foobuf[key.size] = '\0';
                 fprintf(stderr, "re-read keydir for key %s: 0x%lx\r\n", foobuf, RBExactQuery(keydir->entries, &(new_entry->key_sz)));
             }
+#endif /* DELME */
 
             // Update the stats
             keydir->key_count++;
@@ -753,12 +760,10 @@ ERL_NIF_TERM bitcask_nifs_keydir_itr_next(ErlNifEnv* env, int argc, const ERL_NI
         bitcask_keydir_entry_keycheat* e = (bitcask_keydir_entry_keycheat*)buf;
         e->key_sz = handle->last_key_sz;
         memcpy(e->key, handle->last_key, handle->last_key_sz);
-        e->key[e->key_sz] = '\0'; fprintf(stderr, "itr line %d handle 0x%lx last key %s\r\n", __LINE__, handle, e->key);
         rb_red_blk_node *node;
         while ((node = TreeNext(keydir->entries, e)) != NULL)
         {
             entry = node->info;
-            fprintf(stderr, "itr line %d handle 0x%lx next is %s\r\n", __LINE__, handle, entry->key);
             if (1)
             {
                 ErlNifBinary key;
@@ -784,7 +789,6 @@ ERL_NIF_TERM bitcask_nifs_keydir_itr_next(ErlNifEnv* env, int argc, const ERL_NI
                 // Update the iterator to the next entry
                 handle->last_key_sz = entry->key_sz; /* SLF fixme? */
                 memcpy(handle->last_key, entry->key, entry->key_sz); /* SLF fixme? */
-                fprintf(stderr, "itr line %d update handle 0x%lx key_sz %d key %s\r\n", __LINE__, handle, handle->last_key_sz, handle->last_key);
                 return curr;
             }
         }
@@ -1218,7 +1222,6 @@ static int keydir_entry_equal(const void* x, const void* y)
     /* const */ bitcask_keydir_entry_keycheat* rhs = y;
     int cmp;
 
-    lhs->key[lhs->key_sz] = '\0'; rhs->key[rhs->key_sz] = '\0'; fprintf(stderr, "keydir_entry_equal: %s (%d) vs %s (%d)\n", lhs->key, lhs->key_sz, rhs->key, rhs->key_sz);
     if (lhs->key_sz < rhs->key_sz)
     {
         cmp = memcmp_101(lhs->key, rhs->key, lhs->key_sz);
@@ -1230,7 +1233,6 @@ static int keydir_entry_equal(const void* x, const void* y)
     else if (lhs->key_sz > rhs->key_sz)
     {
         cmp = memcmp_101(lhs->key, rhs->key, rhs->key_sz);
-        fprintf(stderr, "left is longer (%d vs %d), cmp -> %d\n", lhs->key_sz, rhs->key_sz, cmp);
         if (cmp == 0)
             return 1;
         else
@@ -1278,7 +1280,6 @@ static int fstats_entry_equal(const void* x, const void* y)
     const uint32_t* lhs = x;
     const uint32_t* rhs = y;
 
-    fprintf(stderr, "fstats entry equal: %lu vs %lu\r\n", *lhs, *rhs);
     if (*lhs < *rhs)
         return -1;
     else if (*lhs == *rhs)
