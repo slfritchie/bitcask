@@ -720,6 +720,7 @@ ERL_NIF_TERM bitcask_nifs_keydir_itr(ErlNifEnv* env, int argc, const ERL_NIF_TER
         // Ready to go; initialize the faux-iterator and unlock the signal mutex
         handle->last_key_sz = 0;
         memset(handle->last_key, '\0', sizeof(handle->last_key)); /* paranoia */
+        fprintf(stderr, "itr line %d SETUP handle 0x%lx\r\n", __LINE__, handle);
         enif_mutex_unlock(handle->il_signal_mutex);
 
         return ATOM_OK;
@@ -752,10 +753,12 @@ ERL_NIF_TERM bitcask_nifs_keydir_itr_next(ErlNifEnv* env, int argc, const ERL_NI
         bitcask_keydir_entry* e = (bitcask_keydir_entry*)buf;
         e->key_sz = handle->last_key_sz;
         memcpy(e->key, handle->last_key, handle->last_key_sz);
+        e->key[e->key_sz] = '\0'; fprintf(stderr, "itr line %d handle 0x%lx last key %s\r\n", __LINE__, handle, e->key);
         rb_red_blk_node *node;
         while ((node = TreeNext(keydir->entries, e)) != NULL)
         {
             entry = node->info;
+            fprintf(stderr, "itr line %d handle 0x%lx next is %s\r\n", __LINE__, handle, entry->key);
             if (1)
             {
                 ErlNifBinary key;
@@ -779,8 +782,9 @@ ERL_NIF_TERM bitcask_nifs_keydir_itr_next(ErlNifEnv* env, int argc, const ERL_NI
                                                      enif_make_uint(env, entry->tstamp));
 
                 // Update the iterator to the next entry
-                handle->last_key_sz = e->key_sz; /* SLF fixme? */
+                handle->last_key_sz = entry->key_sz; /* SLF fixme? */
                 memcpy(handle->last_key, entry->key, entry->key_sz); /* SLF fixme? */
+                fprintf(stderr, "itr line %d update handle 0x%lx key_sz %d key %s\r\n", __LINE__, handle, handle->last_key_sz, handle->last_key);
                 return curr;
             }
         }
@@ -1207,11 +1211,11 @@ static int memcmp_101(const char *a, const char *b, int len)
 
 static int keydir_entry_equal(const void* x, const void* y)
 {
-    const bitcask_keydir_entry_keycheat* lhs = x;
-    const bitcask_keydir_entry_keycheat* rhs = y;
+    /* const */ bitcask_keydir_entry_keycheat* lhs = x;
+    /* const */ bitcask_keydir_entry_keycheat* rhs = y;
     int cmp;
 
-    /* lhs->key[lhs->key_sz] = '\0'; rhs->key[rhs->key_sz] = '\0'; fprintf(stderr, "keydir_entry_equal: %s vs %s\n", lhs->key, rhs->key); */
+    lhs->key[lhs->key_sz] = '\0'; rhs->key[rhs->key_sz] = '\0'; fprintf(stderr, "keydir_entry_equal: %s (%d) vs %s (%d)\n", lhs->key, lhs->key_sz, rhs->key, rhs->key_sz);
     if (lhs->key_sz < rhs->key_sz)
     {
         cmp = memcmp_101(lhs->key, rhs->key, lhs->key_sz);
@@ -1223,6 +1227,7 @@ static int keydir_entry_equal(const void* x, const void* y)
     else if (lhs->key_sz > rhs->key_sz)
     {
         cmp = memcmp_101(lhs->key, rhs->key, rhs->key_sz);
+        fprintf(stderr, "left is longer (%d vs %d), cmp -> %d\n", lhs->key_sz, rhs->key_sz, cmp);
         if (cmp == 0)
             return 1;
         else

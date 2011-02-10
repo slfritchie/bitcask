@@ -293,6 +293,7 @@ fold_keys(Ref, Fun, Acc0) ->
     %% Fun should be of the form F(#bitcask_entry, A) -> A
     ExpiryTime = expiry_time((get_state(Ref))#bc_state.opts),
     RealFun = fun(BCEntry, Acc) ->
+io:format(user, "Line ~p ~p\n", [?LINE, BCEntry]),
         Key = BCEntry#bitcask_entry.key,
         case BCEntry#bitcask_entry.tstamp < ExpiryTime of
             true ->
@@ -1098,17 +1099,29 @@ io:format(user, "Line ~p\n", [?LINE]),
 list_keys_test() ->
 io:format(user, "Line ~p\n", [?LINE]),
     os:cmd("rm -rf /tmp/bc.test.listkeys"),
+io:format(user, "Line ~p\n", [?LINE]),
     B = bitcask:open("/tmp/bc.test.listkeys", [read_write]),
+io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B,<<"k">>,<<"v">>),
+io:format(user, "Line ~p\n", [?LINE]),
     {ok, <<"v">>} = bitcask:get(B,<<"k">>),
+io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B, <<"k2">>, <<"v2">>),
+io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B, <<"k">>,<<"v3">>),
+io:format(user, "Line ~p\n", [?LINE]),
     {ok, <<"v2">>} = bitcask:get(B, <<"k2">>),
+io:format(user, "Line ~p\n", [?LINE]),
     {ok, <<"v3">>} = bitcask:get(B, <<"k">>),
+io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:delete(B,<<"k">>),
+io:format(user, "Line ~p\n", [?LINE]),
     ok = bitcask:put(B, <<"k7">>,<<"v7">>),
+io:format(user, "Line ~p\n", [?LINE]),
     true = ([<<"k2">>,<<"k7">>] =:= lists:sort(bitcask:list_keys(B))),
+io:format(user, "Line ~p\n", [?LINE]),
     close(B),
+io:format(user, "Line ~p\n", [?LINE]),
     ok.
 
 expire_test() ->
