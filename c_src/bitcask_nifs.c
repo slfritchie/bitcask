@@ -237,13 +237,15 @@ ERL_NIF_TERM bitcask_nifs_keydir_new1(ErlNifEnv* env, int argc, const ERL_NIF_TE
     char name[MAX_PATH_LEN];
     size_t name_sz;
 
-fprintf(stderr, "new1\n");
     if (enif_get_string(env, argv[0], name, sizeof(name), ERL_NIF_LATIN1))
     {
         name_sz = strlen(name);
 
         // Get our private stash and check the global hash table for this entry
         bitcask_priv_data* priv = (bitcask_priv_data*)enif_priv_data(env);
+fprintf(stderr, "new1: name %s\r\n", name);
+RBTreePrint(priv->global_keydirs);
+fprintf(stderr, "new1: done\r\n");
         enif_mutex_lock(priv->global_keydirs_lock);
 
         bitcask_keydir* keydir;
@@ -251,6 +253,7 @@ fprintf(stderr, "new1\n");
         if (node != NULL)
         {
             keydir = node->info;
+            fprintf(stderr, "new1: match %s\n", keydir->name);
             // Existing keydir is available. Check the is_ready flag to determine if
             // the original creator is ready for other processes to use it.
             if (!keydir->is_ready)
@@ -267,6 +270,7 @@ fprintf(stderr, "new1\n");
         }
         else
         {
+            fprintf(stderr, "new1: miss\r\n");
             // No such keydir, create a new one and add to the globals list. Make sure
             // to allocate enough room for the name.
             keydir = enif_alloc_compat(env, sizeof(bitcask_keydir) + name_sz + 1);
@@ -366,7 +370,7 @@ static rb_red_blk_node* find_keydir_entry(ErlNifEnv* env, bitcask_keydir* keydir
             char foobuf[99999];
             memcpy(foobuf, key->data, key->size);
             foobuf[key->size] = '\0';
-            fprintf(stderr, "find_keydir_entry: %s -> 0x%lx info 0x%lx\r\n", foobuf, xx, (xx == NULL) ? 0 : xx->info);
+            fprintf(stderr, "find_keydir_entry: kd 0x%lx %s key %s -> 0x%lx info 0x%lx\r\n", keydir->entries, keydir->name, foobuf, xx, (xx == NULL) ? 0 : xx->info);
         }
         return xx;
         /* return RBExactQuery(keydir->entries, e); */
@@ -404,6 +408,7 @@ ERL_NIF_TERM bitcask_nifs_keydir_put_int(ErlNifEnv* env, int argc, const ERL_NIF
         // Now that we've marshalled everything, see if the tstamp for this key is >=
         // to what's already in the hash. Otherwise, we don't bother with the update.
         rb_red_blk_node* node = find_keydir_entry(env, keydir, &key);
+        fprintf(stderr, "put_int LINE %d find -> 0x%lx\r\n", __LINE__, (long) node);
         if (node == NULL)
         {
             // No entry exists at all yet; add one
@@ -425,7 +430,12 @@ ERL_NIF_TERM bitcask_nifs_keydir_put_int(ErlNifEnv* env, int argc, const ERL_NIF
                 fprintf(stderr, "inserting keydir for key %s\r\n", foobuf);
             }
             my_tree_insert(keydir->entries, &(new_entry->key_sz), new_entry);
-            fprintf(stderr, "re-read keydir for key %s: 0x%lx\r\n", key.data, RBExactQuery(keydir->entries, &(new_entry->key_sz)));
+            {
+                char foobuf[99999];
+                memcpy(foobuf, key.data, key.size);
+                foobuf[key.size] = '\0';
+                fprintf(stderr, "re-read keydir for key %s: 0x%lx\r\n", foobuf, RBExactQuery(keydir->entries, &(new_entry->key_sz)));
+            }
 
             // Update the stats
             keydir->key_count++;
@@ -449,6 +459,9 @@ ERL_NIF_TERM bitcask_nifs_keydir_put_int(ErlNifEnv* env, int argc, const ERL_NIF
              ((old_entry->file_id == entry.file_id) &&
               (old_entry->offset < entry.offset))))
         {
+            fprintf(stderr, "put_int LINE %d\r\n", __LINE__);
+            fprintf(stderr, "old_entry tstamp %lu file_id %lu offset %lu\r\n",   old_entry->tstamp, old_entry->file_id, old_entry->offset);
+            fprintf(stderr, "    entry tstamp %lu file_id %lu offset %lu\r\n",   entry.tstamp, entry.file_id, entry.offset);
             // Entry already exists. Decrement live counter on the fstats entry
             // for the old file ID and update both counters for new file. Note
             // that this only needs to be done if the file_ids are not the
@@ -480,6 +493,7 @@ ERL_NIF_TERM bitcask_nifs_keydir_put_int(ErlNifEnv* env, int argc, const ERL_NIF
         }
         else
         {
+        fprintf(stderr, "put_int LINE %d find -> 0x%lx\r\n", __LINE__, (long) node);
             // If the keydir is in the process of being loaded, it's safe to update
             // fstats on a failed put. Once the keydir is live, any attempts to put
             // in old data would just be ignored to avoid double-counting problems.
@@ -1100,7 +1114,7 @@ static void free_keydir(ErlNifEnv* env, bitcask_keydir* keydir)
     // Delete all the entries in the hash table, which also has the effect of
     // freeing up all resources associated with the table.
 
-    fprintf(stderr, "SLF: free_keydir\n");
+    fprintf(stderr, "SLF: free_keydir %s\n", keydir->name);
     my_env_copy = env;         /* RBTreeDestroy hack setup */
 
     RBTreeDestroy(keydir->entries);
@@ -1301,6 +1315,7 @@ static int bitcask_keydir_entry_equal(const void* x, const void* y)
     const bitcask_keydir* rhs = y;
     int n;
 
+    fprintf(stderr, "bitcask_keydir_entry_equal: %s %s -> %d\r\n", lhs->name, rhs->name, strcmp(lhs->name, rhs->name));
     if ((n = strcmp(lhs->name, rhs->name)) < 0)
         return -1;
     else if (n == 0)
