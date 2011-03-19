@@ -1148,7 +1148,9 @@ static void bitcask_nifs_keydir_resource_cleanup(ErlNifEnv* env, void* arg)
             // This is the last reference to the named keydir. As such,
             // remove it from the hashtable so no one else tries to use it
             rb_red_blk_node* node = RBExactQuery(priv->global_keydirs, keydir->name);
+            my_env_copy = env;
             RBDelete(priv->global_keydirs, node);
+            my_env_copy = NULL;
         }
         else
         {
@@ -1234,7 +1236,7 @@ static void keydir_destroy_info(void *x)
         // noop
     } else {
         bitcask_keydir_entry *current_entry = x;
-        enif_free_compat(env, current_entry);
+        enif_free_compat(my_env_copy, current_entry);
     }
 }
 
@@ -1278,7 +1280,7 @@ static void fstats_destroy_info(void *x)
         // noop
     } else {
         bitcask_fstats_entry *curr_f = x;
-        enif_free_compat(env, curr_f);
+        enif_free_compat(my_env_copy, curr_f);
     }
 }
 
